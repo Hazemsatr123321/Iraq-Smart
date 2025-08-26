@@ -255,6 +255,13 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             throw error;
         }
         setAds(prev => [...prev, data as Ad]);
+
+        // Check for suspicious activity
+        const { error: rpcError } = await supabase.rpc('check_suspicious_ad_posting', { user_id_param: userId });
+        if (rpcError) {
+            console.error('Error checking for suspicious activity:', rpcError);
+        }
+
         return data as Ad;
     };
     

@@ -49,3 +49,27 @@ begin
     (select avg(rating) from reviews where (reviewer_id = user_id_1 and seller_id = user_id_2) or (reviewer_id = user_id_2 and seller_id = user_id_1));
 end;
 $$ language plpgsql;
+
+-- Function to check for suspicious ad posting activity
+create or replace function check_suspicious_ad_posting(user_id_param uuid)
+returns void as $$
+declare
+  ad_count integer;
+begin
+  -- Count ads created by the user in the last hour
+  select count(*)
+  into ad_count
+  from ads
+  where user_id = user_id_param and created_at > (now() - interval '1 hour');
+
+  -- If count exceeds threshold, log it as suspicious
+  if ad_count > 5 then
+    insert into suspicious_activities (description, related_user_id, priority)
+    values (
+      'User posted ' || ad_count || ' ads in the last hour.',
+      user_id_param,
+      'medium'
+    );
+  end if;
+end;
+$$ language plpgsql security definer;
