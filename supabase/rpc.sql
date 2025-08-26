@@ -73,3 +73,30 @@ begin
   end if;
 end;
 $$ language plpgsql security definer;
+
+-- Function to check for suspicious review activity
+create or replace function check_suspicious_reviews(seller_id_param uuid)
+returns void as $$
+declare
+  negative_review_count integer;
+begin
+  -- Count negative reviews (rating 1 or 2) for the seller in the last 24 hours
+  select count(*)
+  into negative_review_count
+  from reviews
+  where
+    seller_id = seller_id_param and
+    rating <= 2 and
+    "timestamp" > (now() - interval '24 hours');
+
+  -- If count exceeds threshold, log it as suspicious
+  if negative_review_count > 3 then
+    insert into suspicious_activities (description, related_user_id, priority)
+    values (
+      'User received ' || negative_review_count || ' negative reviews in the last 24 hours.',
+      seller_id_param,
+      'high'
+    );
+  end if;
+end;
+$$ language plpgsql security definer;

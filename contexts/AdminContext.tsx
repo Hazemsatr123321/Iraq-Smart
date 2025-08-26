@@ -566,7 +566,16 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         addReview: async (reviewData) => {
             const { data, error } = await supabase.from('reviews').insert(reviewData).select().single();
             if (error) throw error;
-            if (data) setReviews(prev => [...prev, data as Review]);
+            if (data) {
+                setReviews(prev => [...prev, data as Review]);
+                // Check for suspicious activity
+                if (data.rating <= 2) {
+                    const { error: rpcError } = await supabase.rpc('check_suspicious_reviews', { seller_id_param: data.seller_id });
+                    if (rpcError) {
+                        console.error('Error checking for suspicious reviews:', rpcError);
+                    }
+                }
+            }
         },
         markAsRead: async (notificationId) => {
             const { data, error } = await supabase.from('notifications').update({ is_read: true }).eq('id', notificationId).select().single();
