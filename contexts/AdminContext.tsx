@@ -622,7 +622,14 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         addRfq: async (rfqData, userId) => {
             const { data, error } = await supabase.from('rfqs').insert({ ...rfqData, user_id: userId, status: 'open' }).select().single();
             if (error) throw error;
-            if (data) setRfqs(prev => [...prev, data as RequestForQuotation]);
+            if (data) {
+                setRfqs(prev => [...prev, data as RequestForQuotation]);
+                // Check for suspicious activity
+                const { error: rpcError } = await supabase.rpc('check_suspicious_rfqs', { user_id_param: userId });
+                if (rpcError) {
+                    console.error('Error checking for suspicious RFQs:', rpcError);
+                }
+            }
         },
         addOfferToRfq: async (offerData, sellerId) => {
             const { data, error } = await supabase.from('offers').insert({ ...offerData, seller_id: sellerId }).select().single();

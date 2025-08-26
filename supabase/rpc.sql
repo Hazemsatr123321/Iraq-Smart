@@ -74,6 +74,32 @@ begin
 end;
 $$ language plpgsql security definer;
 
+-- Function to check for suspicious RFQ creation activity
+create or replace function check_suspicious_rfqs(user_id_param uuid)
+returns void as $$
+declare
+  rfq_count integer;
+begin
+  -- Count RFQs created by the user in the last hour
+  select count(*)
+  into rfq_count
+  from rfqs
+  where
+    user_id = user_id_param and
+    "timestamp" > (now() - interval '1 hour');
+
+  -- If count exceeds threshold, log it as suspicious
+  if rfq_count > 10 then
+    insert into suspicious_activities (description, related_user_id, priority)
+    values (
+      'User created ' || rfq_count || ' RFQs in the last hour.',
+      user_id_param,
+      'medium'
+    );
+  end if;
+end;
+$$ language plpgsql security definer;
+
 -- Function to check for suspicious review activity
 create or replace function check_suspicious_reviews(seller_id_param uuid)
 returns void as $$
