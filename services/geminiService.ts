@@ -4,14 +4,19 @@ import { Ad, RequestForQuotation, MarketAnalysis, NegotiationSession, Partnershi
 // Initialize the Google AI client with the API key from environment variables.
 // For Vite, environment variables must be prefixed with VITE_ to be exposed to the client.
 const apiKey = import.meta.env.VITE_API_KEY;
-if (!apiKey) {
-  console.error("VITE_API_KEY is not set. AI features will not work.");
+
+let ai: GoogleGenAI | null = null;
+if (apiKey) {
+  ai = new GoogleGenAI({ apiKey });
+} else {
+  console.error("VITE_API_KEY is not set in your .env file. AI features will be disabled.");
 }
-const ai = new GoogleGenAI({ apiKey });
 
 const model = 'gemini-2.5-flash';
+const disabledError = "ميزة الذكاء الاصطناعي معطلة. يرجى التأكد من إضافة مفتاح API.";
 
 export const generateAdFromKeywords = async (keywords: string): Promise<string> => {
+  if (!ai) return disabledError;
   try {
     const prompt = `أنت خبير تسويق إعلانات جملة في العراق. مهمتك هي كتابة وصف إعلان جذاب ومقنع باللغة العربية واللهجة العراقية الدارجة لجذب انتباه أصحاب المحلات والتجار.
     استخدم الكلمات التالية كنقطة انطلاق: "${keywords}"
@@ -38,6 +43,7 @@ export const generateAdFromKeywords = async (keywords: string): Promise<string> 
 };
 
 export const parseSearchQuery = async (query: string): Promise<any> => {
+  if (!ai) return { error: disabledError };
   try {
     const prompt = `حلل طلب البحث التالي من مستخدم عراقي يبحث في سوق جملة: "${query}".
     استخرج المعلومات التالية وأرجعها بصيغة JSON فقط بدون أي نص إضافي:
@@ -77,6 +83,7 @@ export const parseSearchQuery = async (query: string): Promise<any> => {
 };
 
 export const searchByImage = async (imagePart: Part): Promise<any> => {
+    if (!ai) return { error: disabledError };
     try {
         const textPart = {
             text: `أنت خبير في سوق الجملة العراقي. حلل صورة المنتج هذه. استجب فقط بكائن JSON قابل للتحليل يحتوي على "product" (اسم المنتج أو الفئة) و "attributes" (مجموعة من الكلمات المفتاحية ذات الصلة). لا تضف أي نص آخر أو تنسيق markdown. مثال: {"product": "تمر", "attributes": ["كراتين", "تغليف جيد"]}`
@@ -115,6 +122,7 @@ export const searchByImage = async (imagePart: Part): Promise<any> => {
 };
 
 export const generateAdOptimizationAdvice = async (ad: Ad): Promise<string> => {
+  if (!ai) return disabledError;
   try {
     const prompt = `أنت خبير تسويق إعلانات جملة في العراق. مهمتك هي تحليل الإعلان التالي وتقديم نصائح قابلة للتنفيذ لتحسينه وزيادة جاذبيته للمشترين.
     
@@ -146,6 +154,7 @@ export const generateAdOptimizationAdvice = async (ad: Ad): Promise<string> => {
 };
 
 export const generatePricingAdvice = async (productName: string, myPrice: number, competitorPrices: number[]): Promise<string> => {
+  if (!ai) return disabledError;
   try {
     const prompt = `أنت مستشار أعمال خبير في السوق العراقي.
     أنا تاجر أبيع منتج "${productName}" بسعر ${myPrice.toLocaleString('ar-IQ')} دينار.
@@ -163,6 +172,7 @@ export const generatePricingAdvice = async (productName: string, myPrice: number
 };
 
 export const generateDemandAdvice = async (hotspots: { province: string, count: number }[]): Promise<string> => {
+  if (!ai) return disabledError;
   try {
     const hotspotsText = hotspots.map(h => `${h.province} (${h.count} طلبات)`).join('، ');
     const prompt = `أنت محلل بيانات سوق خبير بالسوق العراقي.
@@ -180,6 +190,7 @@ export const generateDemandAdvice = async (hotspots: { province: string, count: 
 };
 
 export const generateOpportunityAdvice = async (opportunities: { productName: string, demand: number, supply: number }[]): Promise<string> => {
+  if (!ai) return disabledError;
   try {
     const opportunitiesText = opportunities.map(o => `${o.productName} (الطلب: ${o.demand}، العرض: ${o.supply})`).join('؛ ');
     const prompt = `أنت خبير استراتيجي في اكتشاف فرص السوق العراقي.
@@ -201,6 +212,7 @@ export const generateMarketBriefing = async (
   recentAds: Ad[],
   hotspots: { province: string, count: number }[]
   ): Promise<string> => {
+  if (!ai) return disabledError;
   try {
     const topRfqsText = topRfqs.map(r => `${r.product_name} في ${r.province}`).join('، ');
     const recentAdsText = recentAds.map(a => `${a.title} في ${a.province}`).join('، ');
@@ -236,6 +248,7 @@ export const generateRfqOffer = async (
   rfq: RequestForQuotation, 
   sellerAds: Ad[]
 ): Promise<{ suggestedPrice: number; offerText: string }> => {
+  if (!ai) return { suggestedPrice: 0, offerText: disabledError };
   try {
     const relevantAdsText = sellerAds
         .filter(ad => ad.category === rfq.category)
@@ -306,6 +319,7 @@ export const generateMarketAnalysis = async (marketData: {
   recentAds: Ad[],
   hotspots: { province: string, count: number }[]
 }): Promise<MarketAnalysis> => {
+  if (!ai) throw new Error(disabledError);
   try {
     const prompt = `أنت محلل بيانات وخبير استراتيجي في سوق الجملة العراقي.
     حلل البيانات التالية وقدم تقريراً استخباراتياً موجزاً.
@@ -361,6 +375,7 @@ export const estimateLogistics = async (
   destination: string,
   category: string
 ): Promise<{ cost: string; time: string }> => {
+  if (!ai) return { cost: "غير متوفر", time: "غير متوفر" };
   try {
     const prompt = `أنت خبير لوجستي في العراق. قدّر تكلفة الشحن والمدة الزمنية لنقل بضائع بالجملة من فئة "${category}" من محافظة "${origin}" إلى محافظة "${destination}".
     
@@ -404,6 +419,7 @@ export const estimateLogistics = async (
 export const generateDealMemoFromChat = async (
   chatHistory: string
 ): Promise<{ product: string; quantity: string; price: string; terms: string }> => {
+  if (!ai) throw new Error(disabledError);
   try {
     const prompt = `أنت مساعد ذكي متخصص في تحليل محادثات الصفقات التجارية في العراق.
     حلل سجل المحادثة التالي بين بائع ومشترٍ واستخرج تفاصيل الاتفاق النهائي.
@@ -477,6 +493,7 @@ export const generateNegotiationCounterOffer = async (
   ad: Ad,
   buyerOffer: number
 ): Promise<{ responseText: string; counterOffer?: number; accept: boolean }> => {
+  if (!ai) throw new Error(disabledError);
   try {
     const prompt = `أنت وكيل تفاوض ذكي تمثل بائعاً في سوق جملة عراقي.
     
@@ -529,6 +546,7 @@ export const generateNegotiationCounterOffer = async (
 };
 
 export const generatePartnershipAnalysis = async (score: number, dealCount: number): Promise<string> => {
+    if (!ai) return disabledError;
     try {
         const prompt = `أنت مستشار أعمال متخصص في العلاقات التجارية B2B في العراق.
         بناءً على البيانات التالية، اكتب تحليلاً موجزاً ومقنعاً باللهجة العراقية حول قوة الشراكة بين مستخدمين.
