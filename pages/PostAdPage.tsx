@@ -15,6 +15,7 @@ import { ShieldCheckIcon } from '../components/icons/ShieldCheckIcon';
 import { StarIcon } from '../components/icons/StarIcon';
 import { HandHeartIcon } from '../components/icons/HandHeartIcon';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { uploadAdImage, deleteAdImage } from '../../services/storageService';
 
 const STEPS = ['التفاصيل', 'البيع', 'الصور', 'المراجعة'];
 
@@ -51,7 +52,6 @@ export const PostAdPage: React.FC<{
   
   const [imageFiles, setImageFiles] = useState<Map<string, File>>(new Map());
 
-  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [isAuction, setIsAuction] = useState(false);
   const [auctionStartPrice, setAuctionStartPrice] = useState('');
   const [priceTiers, setPriceTiers] = useState<{ quantity: string, price: string }[]>([{ quantity: '', price: '' }]);
@@ -122,15 +122,19 @@ export const PostAdPage: React.FC<{
     if (!formData.images) return;
     const imageUrlToRemove = formData.images[indexToRemove];
     
-    // Remove from local state immediately
+    // Optimistically remove from local state
     const updatedImages = formData.images.filter((_, i) => i !== indexToRemove);
-    setFormData(prev => ({...prev, images: updatedImages}));
+    setFormData(prev => ({ ...prev, images: updatedImages }));
 
     if (imageUrlToRemove.startsWith('blob:')) {
+      // It's a new, unsaved image
       URL.revokeObjectURL(imageUrlToRemove);
       const newImageFiles = new Map(imageFiles);
       newImageFiles.delete(imageUrlToRemove);
       setImageFiles(newImageFiles);
+    } else {
+      // It's an existing image from storage
+      await deleteAdImage(imageUrlToRemove);
     }
   }
 
@@ -171,7 +175,15 @@ export const PostAdPage: React.FC<{
             return;
         }
 
-        const finalImageUrls = formData.images || [];
+        // Upload new images (the ones that are blob URLs)
+        const uploadPromises = Array.from(imageFiles.entries())
+            .map(([previewUrl, file]) => uploadAdImage(file, currentUser.id));
+
+        const newImageUrls = await Promise.all(uploadPromises);
+
+        // Combine old images (non-blob) with new ones
+        const existingImageUrls = (formData.images || []).filter(url => !url.startsWith('blob:'));
+        const finalImageUrls = [...existingImageUrls, ...newImageUrls];
 
         const finalPrice = isAuction ? `يبدأ من ${auctionStartPrice} د.ع` : formData.price;
         const finalPriceTiers = priceTiers.filter(pt => pt.quantity && pt.price).map(pt => ({ quantity: Number(pt.quantity), price: pt.price }));
