@@ -2,41 +2,44 @@
 
 import React, { createContext, useState, useContext, ReactNode, useCallback, useMemo, useEffect } from 'react';
 import type { User, Ad, ExternalAd, AppSettings, UserRole, Category, Province, Review, Notification, RequestForQuotation, Offer, FeatureFlag, Auction, Bid, PersonalizedOffer, StockWatch, MarketBrief, SystemHealth, SuspiciousActivity, Opportunity, DealMemo, SmartPayment, NegotiationSession, OrderEvent, NegotiationMessage, ChatConversation, ChatMessage, FlashDeal, Campaign, ChatMessageDbRow } from '../types';
-import * as mockData from '../data/mockData';
+import { supabase } from '../services/supabaseClient';
 import { ConnectionStatus } from '../components/common/ConnectionStatusIndicator';
+import { Database } from '../types/supabase';
+
+type Tables = Database['public']['Tables'];
 
 interface AppState {
-  users: User[];
-  ads: Ad[];
-  externalAds: ExternalAd[];
+  users: Tables['users']['Row'][];
+  ads: Tables['ads']['Row'][];
+  externalAds: Tables['external_ads']['Row'][];
   settings: AppSettings | null;
-  categories: Category[];
-  provinces: Province[];
-  reviews: Review[];
-  notifications: Notification[];
-  rfqs: RequestForQuotation[];
-  offers: Offer[];
-  featureFlags: FeatureFlag[];
-  auctions: Auction[];
-  personalizedOffers: PersonalizedOffer[];
-  stockWatches: StockWatch[];
-  marketBriefs: MarketBrief[];
+  categories: Tables['categories']['Row'][];
+  provinces: Tables['provinces']['Row'][];
+  reviews: Tables['reviews']['Row'][];
+  notifications: Tables['notifications']['Row'][];
+  rfqs: Tables['rfqs']['Row'][];
+  offers: Tables['offers']['Row'][];
+  featureFlags: Tables['feature_flags']['Row'][];
+  auctions: Tables['auctions']['Row'][];
+  personalizedOffers: Tables['personalized_offers']['Row'][];
+  stockWatches: Tables['stock_watches']['Row'][];
+  marketBriefs: Tables['market_briefs']['Row'][];
   systemHealth: SystemHealth;
-  suspiciousActivities: SuspiciousActivity[];
-  opportunities: Opportunity[];
-  dealMemos: DealMemo[];
-  smartPayments: SmartPayment[];
-  negotiationSessions: NegotiationSession[];
-  conversations: ChatConversation[];
-  messages: ChatMessageDbRow[];
-  campaigns: Campaign[];
+  suspiciousActivities: Tables['suspicious_activities']['Row'][];
+  opportunities: Tables['opportunities']['Row'][];
+  dealMemos: Tables['deal_memos']['Row'][];
+  smartPayments: Tables['smart_payments']['Row'][];
+  negotiationSessions: Tables['negotiation_sessions']['Row'][];
+  conversations: Tables['conversations']['Row'][];
+  messages: Tables['messages']['Row'][];
+  campaigns: Tables['campaigns']['Row'][];
 }
 
-interface AdminContextType extends Omit<AppState, 'settings'> {
+interface AdminContextType extends AppState {
   settings: AppSettings;
   isDataLoaded: boolean;
-  addAd: (newAd: Omit<Ad, 'id' | 'user_id' | 'featured' | 'status' | 'views' | 'saves'>, userId: string) => Promise<Ad>;
-  updateAd: (adId: string, updatedData: Partial<Omit<Ad, 'id'>>) => Promise<void>;
+  addAd: (newAd: Tables['ads']['Insert'], userId: string) => Promise<Tables['ads']['Row']>;
+  updateAd: (adId: string, updatedData: Tables['ads']['Update']) => Promise<void>;
   deleteAd: (adId: string) => Promise<void>;
   toggleAdFeature: (adId: string) => Promise<void>;
   updateAdStatus: (adId: string, status: 'approved' | 'rejected', rejectionReason?: string) => Promise<void>;
@@ -50,12 +53,12 @@ interface AdminContextType extends Omit<AppState, 'settings'> {
   getStockWatchesForUser: (userId: string) => StockWatch[];
   deleteStockWatch: (watchId: string) => Promise<void>;
   featureAdForFree: (adId: string) => Promise<void>;
-  updateUser: (userId: string, updatedData: Partial<Omit<User, 'id'>>) => Promise<void>;
+  updateUser: (userId: string, updatedData: Tables['users']['Update']) => Promise<void>;
   updateUserRole: (userId: string, role: UserRole) => Promise<void>;
   toggleUserBan: (userId: string) => Promise<void>;
   toggleUserVerification: (userId: string) => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
-  addUser: (user: Omit<User, 'id'>) => Promise<User>;
+  addUser: (user: Tables['users']['Insert']) => Promise<Tables['users']['Row']>;
   updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
   addExternalAd: (ad: Omit<ExternalAd, 'id'>) => Promise<void>;
   updateExternalAd: (ad: ExternalAd) => Promise<void>;
@@ -72,7 +75,7 @@ interface AdminContextType extends Omit<AppState, 'settings'> {
   markAsRead: (notificationId: string) => Promise<void>;
   markAllAsRead: (userId: string) => Promise<void>;
   clearAllNotifications: (userId: string) => Promise<void>;
-  createNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'is_read'>) => Promise<void>;
+  createNotification: (notification: Tables['notifications']['Insert']) => Promise<void>;
   unreadNotificationCount: (userId: string) => number;
   toggleFeatureFlag: (featureId: string) => Promise<void>;
   stats: any;
@@ -100,8 +103,8 @@ interface AdminContextType extends Omit<AppState, 'settings'> {
   applyFreeFeature: (adId: string, userId: string) => Promise<void>;
   addNegotiationSession: (sessionData: Omit<NegotiationSession, 'id'>) => Promise<NegotiationSession>;
   addNegotiationMessage: (sessionId: string, message: NegotiationMessage) => Promise<void>;
-  addConversation: (conversationData: Omit<ChatConversation, 'id'>) => Promise<ChatConversation>;
-  addMessage: (messageData: Omit<ChatMessageDbRow, 'id' | 'timestamp'>) => Promise<ChatMessageDbRow>;
+  addConversation: (conversationData: Tables['conversations']['Insert']) => Promise<Tables['conversations']['Row']>;
+  addMessage: (messageData: Tables['messages']['Insert']) => Promise<Tables['messages']['Row']>;
   updateConversationLastMessage: (conversationId: string, message: ChatMessage) => Promise<void>;
   connectionStatus: ConnectionStatus;
   retryConnection: () => void;
@@ -121,130 +124,237 @@ interface AdminContextType extends Omit<AppState, 'settings'> {
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
 export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [state, setState] = useState<AppState>(mockData.initialState);
-    const [isDataLoaded, setIsDataLoaded] = useState(true);
+    const [users, setUsers] = useState<User[]>([]);
+    const [ads, setAds] = useState<Ad[]>([]);
+    const [externalAds, setExternalAds] = useState<ExternalAd[]>([]);
+    const [settings, setSettings] = useState<AppSettings | null>(null);
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [provinces, setProvinces] = useState<Province[]>([]);
+    const [reviews, setReviews] = useState<Review[]>([]);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [rfqs, setRfqs] = useState<RequestForQuotation[]>([]);
+    const [offers, setOffers] = useState<Offer[]>([]);
+    const [featureFlags, setFeatureFlags] = useState<FeatureFlag[]>([]);
+    const [auctions, setAuctions] = useState<Auction[]>([]);
+    const [personalizedOffers, setPersonalizedOffers] = useState<PersonalizedOffer[]>([]);
+    const [stockWatches, setStockWatches] = useState<StockWatch[]>([]);
+    const [marketBriefs, setMarketBriefs] = useState<MarketBrief[]>([]);
+    const [systemHealth, setSystemHealth] = useState<SystemHealth>({ api_status: 'operational', database_status: 'operational', ai_service_status: 'operational' });
+    const [suspiciousActivities, setSuspiciousActivities] = useState<SuspiciousActivity[]>([]);
+    const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+    const [dealMemos, setDealMemos] = useState<DealMemo[]>([]);
+    const [smartPayments, setSmartPayments] = useState<SmartPayment[]>([]);
+    const [negotiationSessions, setNegotiationSessions] = useState<NegotiationSession[]>([]);
+    const [conversations, setConversations] = useState<ChatConversation[]>([]);
+    const [messages, setMessages] = useState<ChatMessageDbRow[]>([]);
+    const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+
+    const [isDataLoaded, setIsDataLoaded] = useState(false);
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('online');
 
+    const fetchData = useCallback(async () => {
+        try {
+            setConnectionStatus('online');
+            setIsDataLoaded(false);
+            const [
+                adsRes, usersRes, categoriesRes, provincesRes, settingsRes,
+                reviewsRes, notificationsRes, rfqsRes, offersRes, featureFlagsRes,
+                auctionsRes, personalizedOffersRes, stockWatchesRes, marketBriefsRes,
+                suspiciousActivitiesRes, opportunitiesRes, dealMemosRes, smartPaymentsRes,
+                negotiationSessionsRes, conversationsRes, messagesRes, externalAdsRes, campaignsRes
+            ] = await Promise.all([
+                supabase.from('ads').select('*'),
+                supabase.from('users').select('*'),
+                supabase.from('categories').select('*'),
+                supabase.from('provinces').select('*'),
+                supabase.from('settings').select('*').single(),
+                supabase.from('reviews').select('*'),
+                supabase.from('notifications').select('*'),
+                supabase.from('rfqs').select('*'),
+                supabase.from('offers').select('*'),
+                supabase.from('feature_flags').select('*'),
+                supabase.from('auctions').select('*'),
+                supabase.from('personalized_offers').select('*'),
+                supabase.from('stock_watches').select('*'),
+                supabase.from('market_briefs').select('*'),
+                supabase.from('suspicious_activities').select('*'),
+                supabase.from('opportunities').select('*'),
+                supabase.from('deal_memos').select('*'),
+                supabase.from('smart_payments').select('*'),
+                supabase.from('negotiation_sessions').select('*'),
+                supabase.from('conversations').select('*'),
+                supabase.from('messages').select('*'),
+                supabase.from('external_ads').select('*'),
+                supabase.from('campaigns').select('*'),
+            ]);
+
+            if (adsRes.data) setAds(adsRes.data as Ad[]);
+            if (usersRes.data) setUsers(usersRes.data as User[]);
+            if (categoriesRes.data) setCategories(categoriesRes.data as Category[]);
+            if (provincesRes.data) setProvinces(provincesRes.data as Province[]);
+            if (settingsRes.data) setSettings(settingsRes.data as AppSettings);
+            if (reviewsRes.data) setReviews(reviewsRes.data as Review[]);
+            if (notificationsRes.data) setNotifications(notificationsRes.data as Notification[]);
+            if (rfqsRes.data) setRfqs(rfqsRes.data as RequestForQuotation[]);
+            if (offersRes.data) setOffers(offersRes.data as Offer[]);
+            if (featureFlagsRes.data) setFeatureFlags(featureFlagsRes.data as FeatureFlag[]);
+            if (auctionsRes.data) setAuctions(auctionsRes.data as Auction[]);
+            if (personalizedOffersRes.data) setPersonalizedOffers(personalizedOffersRes.data as PersonalizedOffer[]);
+            if (stockWatchesRes.data) setStockWatches(stockWatchesRes.data as StockWatch[]);
+            if (marketBriefsRes.data) setMarketBriefs(marketBriefsRes.data as MarketBrief[]);
+            if (suspiciousActivitiesRes.data) setSuspiciousActivities(suspiciousActivitiesRes.data as SuspiciousActivity[]);
+            if (opportunitiesRes.data) setOpportunities(opportunitiesRes.data as Opportunity[]);
+            if (dealMemosRes.data) setDealMemos(dealMemosRes.data as DealMemo[]);
+            if (smartPaymentsRes.data) setSmartPayments(smartPaymentsRes.data as SmartPayment[]);
+            if (negotiationSessionsRes.data) setNegotiationSessions(negotiationSessionsRes.data as NegotiationSession[]);
+            if (conversationsRes.data) setConversations(conversationsRes.data as ChatConversation[]);
+            if (messagesRes.data) setMessages(messagesRes.data as ChatMessageDbRow[]);
+            if (externalAdsRes.data) setExternalAds(externalAdsRes.data as ExternalAd[]);
+            if (campaignsRes.data) setCampaigns(campaignsRes.data as Campaign[]);
+
+            setIsDataLoaded(true);
+        } catch (error) {
+            console.error('Error loading data:', error);
+            setConnectionStatus('offline');
+            setIsDataLoaded(true); // Still allow app to run with empty/stale data
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
+
     const createNotification = useCallback(async (notification: Omit<Notification, 'id' | 'timestamp' | 'is_read'>) => {
-        const newNotification: Notification = {
-            ...notification,
-            id: `notif-${Date.now()}`,
-            timestamp: new Date().toISOString(),
-            is_read: false
-        };
-        setState(prev => ({ ...prev, notifications: [...prev.notifications, newNotification] }));
+        const { data, error } = await supabase.from('notifications').insert(notification).select().single();
+        if (error) {
+            console.error('Error creating notification:', error);
+            return;
+        }
+        if (data) {
+            setNotifications(prev => [...prev, data as Notification]);
+        }
     }, []);
 
     const addAd = async (newAdData: Omit<Ad, 'id' | 'user_id' | 'featured' | 'status' | 'views' | 'saves'>, userId: string): Promise<Ad> => {
-        const newAd: Ad = {
+        const adToInsert = {
             ...newAdData,
-            id: `ad-${Date.now()}`,
             user_id: userId,
-            status: 'pending',
+            status: 'pending' as const,
             featured: false,
             views: 0,
             saves: 0,
         };
-        setState(prev => ({ ...prev, ads: [...prev.ads, newAd] }));
-        return newAd;
+        const { data, error } = await supabase.from('ads').insert(adToInsert).select().single();
+        if (error) {
+            console.error('Error adding ad:', error);
+            throw error;
+        }
+        setAds(prev => [...prev, data as Ad]);
+        return data as Ad;
     };
     
     const updateAd = async (adId: string, updatedData: Partial<Omit<Ad, 'id'>>) => {
-        setState(prev => ({
-            ...prev,
-            ads: prev.ads.map(ad => ad.id === adId ? { ...ad, ...updatedData, status: 'pending' } : ad)
-        }));
+        const { data, error } = await supabase.from('ads').update(updatedData).eq('id', adId).select().single();
+        if (error) {
+            console.error('Error updating ad:', error);
+            throw error;
+        }
+        setAds(prev => prev.map(ad => ad.id === adId ? data as Ad : ad));
     };
     
     const deleteAd = async (adId: string) => {
-        setState(prev => ({ ...prev, ads: prev.ads.filter(ad => ad.id !== adId) }));
+        const { error } = await supabase.from('ads').delete().eq('id', adId);
+        if (error) {
+            console.error('Error deleting ad:', error);
+            throw error;
+        }
+        setAds(prev => prev.filter(ad => ad.id !== adId));
     };
 
     const trackAdView = async (adId: string) => {
-        setState(prev => ({
-            ...prev,
-            ads: prev.ads.map(ad => ad.id === adId ? { ...ad, views: (ad.views || 0) + 1 } : ad)
-        }));
+        const { error } = await supabase.rpc('increment_ad_views', { ad_id_param: adId });
+        if (error) console.error('Error tracking ad view:', error);
+        else setAds(prev => prev.map(ad => ad.id === adId ? { ...ad, views: (ad.views || 0) + 1 } : ad));
     };
 
     const updateAdSaves = async (adId: string, isFavoriting: boolean) => {
-        setState(prev => ({
-            ...prev,
-            ads: prev.ads.map(ad => ad.id === adId ? { ...ad, saves: (ad.saves || 0) + (isFavoriting ? 1 : -1) } : ad)
-        }));
+        const { error } = await supabase.rpc('update_ad_saves', { ad_id_param: adId, increment: isFavoriting });
+        if (error) console.error('Error updating ad saves:', error);
+        else setAds(prev => prev.map(ad => ad.id === adId ? { ...ad, saves: (ad.saves || 0) + (isFavoriting ? 1 : -1) } : ad));
     };
     
     const updateAdStatus = async (adId: string, status: 'approved' | 'rejected', rejectionReason?: string) => {
-        let adToNotify: Ad | undefined;
-        setState(prev => {
-            const newAds = prev.ads.map(ad => {
-                if (ad.id === adId) {
-                    adToNotify = { ...ad, status, rejection_reason: rejectionReason };
-                    return adToNotify;
-                }
-                return ad;
-            });
-            return { ...prev, ads: newAds };
-        });
-        if (adToNotify) {
+        const { data: updatedAd, error } = await supabase.from('ads').update({ status, rejection_reason: rejectionReason }).eq('id', adId).select().single();
+        if (error) {
+            console.error('Error updating ad status:', error);
+            return;
+        }
+        setAds(prev => prev.map(ad => ad.id === adId ? updatedAd as Ad : ad));
+
+        if (updatedAd) {
             await createNotification({
-                user_id: adToNotify.user_id,
+                user_id: updatedAd.user_id,
                 type: status === 'approved' ? 'ad_approved' : 'ad_rejected',
-                text: status === 'approved' ? `تمت الموافقة على إعلانك: "${adToNotify.title}"` : `تم رفض إعلانك: "${adToNotify.title}"`,
-                link: `/ad/${adToNotify.id}`,
-                related_id: adToNotify.id,
+                text: status === 'approved' ? `تمت الموافقة على إعلانك: "${updatedAd.title}"` : `تم رفض إعلانك: "${updatedAd.title}"`,
+                link: `/ad/${updatedAd.id}`,
+                related_id: updatedAd.id,
             });
         }
     };
     
     const addUser = async (userData: Omit<User, 'id'>): Promise<User> => {
-        const newUser: User = {
-            ...userData,
-            id: `user-${Date.now()}`,
-        };
-        setState(prev => ({ ...prev, users: [...prev.users, newUser]}));
-        return newUser;
+        const { data, error } = await supabase.from('users').insert(userData).select().single();
+        if (error) {
+            console.error('Error adding user:', error);
+            throw error;
+        }
+        setUsers(prev => [...prev, data as User]);
+        return data as User;
     };
     
     const updateUser = async (userId: string, updatedData: Partial<Omit<User, 'id'>>) => {
-        setState(prev => ({
-            ...prev,
-            users: prev.users.map(u => u.id === userId ? {...u, ...updatedData} : u)
-        }));
+        const { data, error } = await supabase.from('users').update(updatedData).eq('id', userId).select().single();
+        if (error) {
+            console.error('Error updating user:', error);
+            throw error;
+        }
+        setUsers(prev => prev.map(u => u.id === userId ? data as User : u));
     };
 
     const addMessage = async (messageData: Omit<ChatMessageDbRow, 'id' | 'timestamp'>): Promise<ChatMessageDbRow> => {
-        const newMessage: ChatMessageDbRow = {
-            ...messageData,
-            id: `msg-${Date.now()}`,
-            timestamp: new Date().toISOString(),
-        };
-        setState(prev => ({ ...prev, messages: [...prev.messages, newMessage]}));
-        return newMessage;
+        const { data, error } = await supabase.from('messages').insert(messageData).select().single();
+        if (error) {
+            console.error('Error adding message:', error);
+            throw error;
+        }
+        setMessages(prev => [...prev, data as ChatMessageDbRow]);
+        return data as ChatMessageDbRow;
     };
 
     const updateConversationLastMessage = async (conversationId: string, message: ChatMessage) => {
-        setState(prev => ({
-            ...prev,
-            conversations: prev.conversations.map(c => c.id === conversationId ? {...c, last_message: message} : c)
-        }));
+        const { error } = await supabase.from('conversations').update({ last_message: message as any }).eq('id', conversationId);
+        if (error) console.error('Error updating conversation:', error);
+        else setConversations(prev => prev.map(c => c.id === conversationId ? {...c, last_message: message} : c));
     };
 
     const addConversation = async (conversationData: Omit<ChatConversation, 'id'>): Promise<ChatConversation> => {
-        const newConversation: ChatConversation = {
-            ...conversationData,
-            id: `conv-${Date.now()}`,
-        };
-        setState(prev => ({ ...prev, conversations: [...prev.conversations, newConversation] }));
-        return newConversation;
+        const { data, error } = await supabase.from('conversations').insert(conversationData).select().single();
+        if (error) {
+            console.error('Error adding conversation:', error);
+            throw error;
+        }
+        setConversations(prev => [...prev, data as ChatConversation]);
+        return data as ChatConversation;
     };
 
     const contextValue: AdminContextType = useMemo(() => ({
-        ...state,
-        settings: state.settings!,
+        users, ads, externalAds, settings: settings!, categories, provinces, reviews, notifications,
+        rfqs, offers, featureFlags, auctions, personalizedOffers, stockWatches, marketBriefs,
+        systemHealth, suspiciousActivities, opportunities, dealMemos, smartPayments, negotiationSessions,
+        conversations, messages, campaigns,
         isDataLoaded,
         connectionStatus,
-        retryConnection: () => {},
+        retryConnection: fetchData,
         addAd,
         updateAd,
         deleteAd,
@@ -259,66 +369,326 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         createNotification,
         // Mocked or simplified implementations for other functions
         toggleAdFeature: async (adId: string) => {
-            setState(prev => ({ ...prev, ads: prev.ads.map(ad => ad.id === adId ? { ...ad, featured: !ad.featured } : ad) }));
+            const ad = ads.find(a => a.id === adId);
+            if(ad) await updateAd(adId, { featured: !ad.featured });
         },
         createAuction: async (adId: string, startPrice: number, durationHours: number) => {
-            const newAuction: Auction = {
-                id: `auc-${adId}`, ad_id: adId, start_price: startPrice, current_price: startPrice,
-                start_time: new Date().toISOString(), end_time: new Date(Date.now() + durationHours * 3600 * 1000).toISOString(),
-                bids: [], status: 'active'
-            };
-            setState(prev => ({...prev, auctions: [...prev.auctions, newAuction]}));
+            const endTime = new Date(Date.now() + durationHours * 3600 * 1000).toISOString();
+            const { data, error } = await supabase.from('auctions').insert({
+                ad_id: adId,
+                start_price: startPrice,
+                current_price: startPrice,
+                start_time: new Date().toISOString(),
+                end_time: endTime,
+                status: 'active',
+                bids: [],
+            }).select().single();
+
+            if (error) {
+                console.error('Error creating auction:', error);
+                throw error;
+            }
+            if (data) {
+                await updateAd(adId, { auction_id: data.id });
+                setAuctions(prev => [...prev, data as Auction]);
+            }
         },
         placeBid: async (auctionId, amount, userId) => {
-            const newBid: Bid = { user_id: userId, amount, timestamp: new Date().toISOString() };
-            setState(prev => ({...prev, auctions: prev.auctions.map(a => a.id === auctionId ? {...a, bids: [...a.bids, newBid], current_price: amount} : a)}));
+            const { error } = await supabase.rpc('place_bid', {
+                p_auction_id: auctionId,
+                p_bid_amount: amount,
+                p_bidder_id: userId
+            });
+
+            if (error) {
+                console.error('Error placing bid:', error);
+                throw error;
+            }
+            // Manually update the local state to reflect the new bid
+            setAuctions(prev => prev.map(auction => {
+                if (auction.id === auctionId) {
+                    const newBids = [...(auction.bids || []), { user_id: userId, amount, timestamp: new Date().toISOString() }];
+                    return { ...auction, bids: newBids, current_price: amount };
+                }
+                return auction;
+            }));
         },
         stats: {
-            userCount: state.users.length,
-            adCount: state.ads.length,
-            pendingAdCount: state.ads.filter(a => a.status === 'pending').length,
-            reviewCount: state.reviews.length,
+            userCount: users.length,
+            adCount: ads.length,
+            pendingAdCount: ads.filter(a => a.status === 'pending').length,
+            reviewCount: reviews.length,
         },
-        getAdById: (adId) => state.ads.find(a => a.id === adId),
-        loadAds: async (options) => { return state.ads; },
-        loadAdById: async (adId) => { return state.ads.find(a=> a.id === adId) || null },
-        loadUserById: async (userId) => { return state.users.find(u=> u.id === userId) || null },
+        getAdById: (adId) => ads.find(a => a.id === adId),
+        loadAds: async (options) => { return ads; }, // Simplified, could add pagination
+        loadAdById: async (adId) => {
+            const ad = ads.find(a => a.id === adId);
+            if (ad) return ad;
+            const { data } = await supabase.from('ads').select('*').eq('id', adId).single();
+            if (data) setAds(prev => [...prev.filter(a => a.id !== adId), data as Ad]);
+            return data as Ad | null;
+        },
+        loadUserById: async (userId) => {
+            const user = users.find(u => u.id === userId);
+            if (user) return user;
+            const { data } = await supabase.from('users').select('*').eq('id', userId).single();
+            if (data) setUsers(prev => [...prev.filter(u => u.id !== userId), data as User]);
+            return data as User | null;
+        },
         loadFeaturedContent: async () => {},
         loadReviewsForSeller: async () => {},
         loadUserContent: async () => {},
         // --- Placeholder functions to satisfy the interface ---
-        createFlashDeal: async () => {}, createPersonalizedOffer: async () => {}, endFlashDeal: async () => {},
-        createStockWatch: async () => {}, getStockWatchesForUser: (userId: string) => state.stockWatches.filter(sw => sw.user_id === userId), deleteStockWatch: async () => {}, featureAdForFree: async () => {},
-        updateUserRole: async (userId, role) => { updateUser(userId, { role }) }, toggleUserBan: async (userId) => { const u = state.users.find(u=>u.id===userId); if(u) updateUser(userId, { banned: !u.banned }) }, toggleUserVerification: async (userId) => { const u = state.users.find(u=>u.id===userId); if(u) updateUser(userId, { is_verified: !u.is_verified }) },
-        deleteUser: async () => {}, 
-        updateSettings: async (newSettings) => { setState(prev => ({...prev, settings: {...prev.settings!, ...newSettings}}))},
-        addExternalAd: async () => {}, updateExternalAd: async () => {}, addCategory: async () => {},
-        deleteCategory: async () => {}, addSubcategory: async () => {}, deleteSubcategory: async () => {},
-        addProvince: async () => {}, deleteProvince: async () => {},
-        getReviewsForSeller: (sellerId) => state.reviews.filter(r => r.seller_id === sellerId), deleteReview: async () => {},
+        createFlashDeal: async (adId, dealPrice, durationHours) => {
+            const endTime = new Date(Date.now() + durationHours * 3600 * 1000).toISOString();
+            const flashDeal: FlashDeal = { is_active: true, deal_price: dealPrice, end_time: endTime };
+            await updateAd(adId, { flash_deal: flashDeal });
+        },
+        createPersonalizedOffer: async (adId, discountPercentage, sellerId) => {
+            const { data, error } = await supabase.from('personalized_offers').insert({ ad_id: adId, discount_percentage: discountPercentage, seller_id: sellerId }).select().single();
+            if (error) throw error;
+            if (data) setPersonalizedOffers(prev => [...prev, data as PersonalizedOffer]);
+        },
+        endFlashDeal: async (adId) => {
+            const ad = ads.find(a => a.id === adId);
+            if (ad && ad.flash_deal) {
+                const flashDeal: FlashDeal = { ...ad.flash_deal, is_active: false };
+                await updateAd(adId, { flash_deal: flashDeal });
+            }
+        },
+        createStockWatch: async (watchData, userId) => {
+            const { data, error } = await supabase.from('stock_watches').insert({ ...watchData, user_id: userId }).select().single();
+            if (error) throw error;
+            if (data) setStockWatches(prev => [...prev, data as StockWatch]);
+        },
+        getStockWatchesForUser: (userId: string) => stockWatches.filter(sw => sw.user_id === userId),
+        deleteStockWatch: async (watchId) => {
+            const { error } = await supabase.from('stock_watches').delete().eq('id', watchId);
+            if (error) throw error;
+            setStockWatches(prev => prev.filter(sw => sw.id !== watchId));
+        },
+        featureAdForFree: async (adId) => {
+            await updateAd(adId, { featured: true });
+        },
+        updateUserRole: async (userId, role) => { await updateUser(userId, { role }) },
+        toggleUserBan: async (userId) => {
+            const user = users.find(u => u.id === userId);
+            if (user) await updateUser(userId, { banned: !user.banned });
+        },
+        toggleUserVerification: async (userId) => {
+            const user = users.find(u => u.id === userId);
+            if (user) await updateUser(userId, { is_verified: !user.is_verified });
+        },
+        deleteUser: async (userId) => {
+            const { error } = await supabase.from('users').delete().eq('id', userId);
+            if (error) throw error;
+            setUsers(prev => prev.filter(u => u.id !== userId));
+        },
+        updateSettings: async (newSettings) => {
+            const { data, error } = await supabase.from('settings').update(newSettings).eq('id', 1).single();
+            if (error) {
+                console.error('Error updating settings:', error);
+                throw error;
+            }
+            if(data) setSettings(data as AppSettings);
+        },
+        addExternalAd: async (ad) => {
+            const { data, error } = await supabase.from('external_ads').insert(ad).select().single();
+            if (error) throw error;
+            if (data) setExternalAds(prev => [...prev, data as ExternalAd]);
+        },
+        updateExternalAd: async (ad) => {
+            const { data, error } = await supabase.from('external_ads').update(ad).eq('id', ad.id).select().single();
+            if (error) throw error;
+            if (data) setExternalAds(prev => prev.map(a => a.id === ad.id ? data as ExternalAd : a));
+        },
+        addCategory: async (name) => {
+            const { data, error } = await supabase.from('categories').insert({ name, subcategories: [] }).select().single();
+            if (error) throw error;
+            if (data) setCategories(prev => [...prev, data as Category]);
+        },
+        deleteCategory: async (id) => {
+            const { error } = await supabase.from('categories').delete().eq('id', id);
+            if (error) throw error;
+            setCategories(prev => prev.filter(c => c.id !== id));
+        },
+        addSubcategory: async (categoryId, name) => {
+            const category = categories.find(c => c.id === categoryId);
+            if (!category) return;
+            const newSubcategories = [...category.subcategories, name];
+            const { data, error } = await supabase.from('categories').update({ subcategories: newSubcategories }).eq('id', categoryId).select().single();
+            if (error) throw error;
+            if (data) setCategories(prev => prev.map(c => c.id === categoryId ? data as Category : c));
+        },
+        deleteSubcategory: async (categoryId, name) => {
+            const category = categories.find(c => c.id === categoryId);
+            if (!category) return;
+            const newSubcategories = category.subcategories.filter(s => s !== name);
+            const { data, error } = await supabase.from('categories').update({ subcategories: newSubcategories }).eq('id', categoryId).select().single();
+            if (error) throw error;
+            if (data) setCategories(prev => prev.map(c => c.id === categoryId ? data as Category : c));
+        },
+        addProvince: async (name) => {
+            const { data, error } = await supabase.from('provinces').insert({ name }).select().single();
+            if (error) throw error;
+            if (data) setProvinces(prev => [...prev, data as Province]);
+        },
+        deleteProvince: async (id) => {
+            const { error } = await supabase.from('provinces').delete().eq('id', id);
+            if (error) throw error;
+            setProvinces(prev => prev.filter(p => p.id !== id));
+        },
+        getReviewsForSeller: (sellerId) => reviews.filter(r => r.seller_id === sellerId),
+        deleteReview: async (reviewId) => {
+            const { error } = await supabase.from('reviews').delete().eq('id', reviewId);
+            if (error) throw error;
+            setReviews(prev => prev.filter(r => r.id !== reviewId));
+        },
         calculateAverageRating: (sellerId: string) => {
-            const relevantReviews = state.reviews.filter(r => r.seller_id === sellerId);
+            const relevantReviews = reviews.filter(r => r.seller_id === sellerId);
             if (relevantReviews.length === 0) return { average: 0, count: 0 };
             const sum = relevantReviews.reduce((acc, r) => acc + r.rating, 0);
             return { average: sum / relevantReviews.length, count: relevantReviews.length };
         },
-        addReview: async () => {}, markAsRead: async () => {}, markAllAsRead: async () => {}, clearAllNotifications: async () => {},
-        unreadNotificationCount: (userId: string) => state.notifications.filter(n => n.user_id === userId && !n.is_read).length,
-        toggleFeatureFlag: async () => {},
+        addReview: async (reviewData) => {
+            const { data, error } = await supabase.from('reviews').insert(reviewData).select().single();
+            if (error) throw error;
+            if (data) setReviews(prev => [...prev, data as Review]);
+        },
+        markAsRead: async (notificationId) => {
+            const { data, error } = await supabase.from('notifications').update({ is_read: true }).eq('id', notificationId).select().single();
+            if (error) throw error;
+            if (data) setNotifications(prev => prev.map(n => n.id === notificationId ? data as Notification : n));
+        },
+        markAllAsRead: async (userId) => {
+            const { data, error } = await supabase.from('notifications').update({ is_read: true }).eq('user_id', userId).select();
+            if (error) throw error;
+            if (data) setNotifications(prev => prev.map(n => n.user_id === userId ? { ...n, is_read: true } : n));
+        },
+        clearAllNotifications: async (userId) => {
+            const { error } = await supabase.from('notifications').delete().eq('user_id', userId);
+            if (error) throw error;
+            setNotifications(prev => prev.filter(n => n.user_id !== userId));
+        },
+        unreadNotificationCount: (userId: string) => notifications.filter(n => n.user_id === userId && !n.is_read).length,
+        toggleFeatureFlag: async (featureId) => {
+            const flag = featureFlags.find(f => f.id === featureId);
+            if (!flag) return;
+            const { data, error } = await supabase.from('feature_flags').update({ is_enabled: !flag.is_enabled }).eq('id', featureId).select().single();
+            if (error) throw error;
+            if (data) setFeatureFlags(prev => prev.map(f => f.id === featureId ? data as FeatureFlag : f));
+        },
         getPricingAnalysis: () => ({ myPrice: null, competitorPrices: [] }), getDemandHotspots: () => [],
         getProductOpportunities: () => [], getOpportunitiesForUser: () => [],
-        getAuctionById: (auctionId: string) => state.auctions.find(a => a.id === auctionId),
-        addRfq: async () => {}, addOfferToRfq: async () => {},
-        getOffersForRfq: (rfqId: string) => state.offers.filter(o => o.rfq_id === rfqId),
-        addMarketBrief: async (brief) => { const newBrief: MarketBrief = { ...brief, id: `brief-${Date.now()}` }; setState(prev => ({ ...prev, marketBriefs: [...prev.marketBriefs, newBrief] })); }, addDealMemo: async () => ({} as DealMemo), updateDealMemo: async () => {},
-        scanForSuspiciousActivity: async () => {}, getSmartPaymentByMemoId: (memoId: string) => state.smartPayments.find(p => p.memo_id === memoId),
-        initiateSmartPayment: async () => ({} as SmartPayment), updateSmartPaymentStatus: async () => {},
-        addShippingInfoToPayment: async () => {}, raiseDispute: async () => {}, resolveDispute: async () => {},
-        calculatePartnershipScore: () => ({ dealCount: 0, avgRating: 0 }), grantReferralReward: async () => {},
-        applyFreeFeature: async () => {}, addNegotiationSession: async () => ({} as NegotiationSession),
-        addNegotiationMessage: async () => {}, addDonationToCampaign: async () => {}, addCampaign: async () => ({} as Campaign),
-        updateCampaign: async () => {}, deleteCampaign: async () => {},
-    }), [state, isDataLoaded, connectionStatus, createNotification]);
+        getAuctionById: (auctionId: string) => auctions.find(a => a.id === auctionId),
+        addRfq: async (rfqData, userId) => {
+            const { data, error } = await supabase.from('rfqs').insert({ ...rfqData, user_id: userId, status: 'open' }).select().single();
+            if (error) throw error;
+            if (data) setRfqs(prev => [...prev, data as RequestForQuotation]);
+        },
+        addOfferToRfq: async (offerData, sellerId) => {
+            const { data, error } = await supabase.from('offers').insert({ ...offerData, seller_id: sellerId }).select().single();
+            if (error) throw error;
+            if (data) setOffers(prev => [...prev, data as Offer]);
+        },
+        getOffersForRfq: (rfqId: string) => offers.filter(o => o.rfq_id === rfqId),
+        addMarketBrief: async (brief) => {
+            const { data, error } = await supabase.from('market_briefs').insert(brief).select().single();
+            if (error) throw error;
+            if (data) setMarketBriefs(prev => [...prev, data as MarketBrief]);
+        },
+        addDealMemo: async (conversationId, dealDetails, creatorId) => {
+            const { data, error } = await supabase.from('deal_memos').insert({ ...dealDetails, conversation_id: conversationId, status: 'pending', approver_ids: [creatorId] }).select().single();
+            if (error) throw error;
+            if (data) setDealMemos(prev => [...prev, data as DealMemo]);
+            return data as DealMemo;
+        },
+        updateDealMemo: async (memoId, updatedData) => {
+            const { data, error } = await supabase.from('deal_memos').update(updatedData).eq('id', memoId).select().single();
+            if (error) throw error;
+            if (data) setDealMemos(prev => prev.map(m => m.id === memoId ? data as DealMemo : m));
+        },
+        scanForSuspiciousActivity: async () => { /* Placeholder for complex logic */ },
+        getSmartPaymentByMemoId: (memoId) => smartPayments.find(p => p.memo_id === memoId),
+        initiateSmartPayment: async (memoId, buyerId, sellerId, amount) => {
+            const { data, error } = await supabase.from('smart_payments').insert({ memo_id: memoId, buyer_id: buyerId, seller_id: sellerId, amount, status: 'pending_deposit', order_history: [] }).select().single();
+            if (error) throw error;
+            if (data) setSmartPayments(prev => [...prev, data as SmartPayment]);
+            return data as SmartPayment;
+        },
+        updateSmartPaymentStatus: async (paymentId, status, description) => {
+            const payment = smartPayments.find(p => p.id === paymentId);
+            if (!payment) return;
+            const newOrderHistory = [...payment.order_history, { timestamp: new Date().toISOString(), status, description: description || '' }];
+            const { data, error } = await supabase.from('smart_payments').update({ status, order_history: newOrderHistory }).eq('id', paymentId).select().single();
+            if (error) throw error;
+            if (data) setSmartPayments(prev => prev.map(p => p.id === paymentId ? data as SmartPayment : p));
+        },
+        addShippingInfoToPayment: async (paymentId, shippingInfo) => {
+            const { data, error } = await supabase.from('smart_payments').update({ shipping_info: shippingInfo }).eq('id', paymentId).select().single();
+            if (error) throw error;
+            if (data) setSmartPayments(prev => prev.map(p => p.id === paymentId ? data as SmartPayment : p));
+        },
+        raiseDispute: async (paymentId, reason) => {
+            await updateSmartPaymentStatus(paymentId, 'disputed', `Dispute raised: ${reason}`);
+        },
+        resolveDispute: async (paymentId, resolution) => {
+            await updateSmartPaymentStatus(paymentId, 'completed', `Dispute resolved: ${resolution}`);
+        },
+        calculatePartnershipScore: () => ({ dealCount: 0, avgRating: 0 }), // Placeholder for complex logic
+        grantReferralReward: async (userId) => {
+            const user = users.find(u => u.id === userId);
+            if(user) await updateUser(userId, { available_feature_rewards: (user.available_feature_rewards || 0) + 1 });
+        },
+        applyFreeFeature: async (adId, userId) => {
+            const user = users.find(u => u.id === userId);
+            if (user && user.available_feature_rewards > 0) {
+                await updateUser(userId, { available_feature_rewards: user.available_feature_rewards - 1 });
+                await updateAd(adId, { featured: true });
+            }
+        },
+        addNegotiationSession: async (sessionData) => {
+            const { data, error } = await supabase.from('negotiation_sessions').insert(sessionData).select().single();
+            if (error) throw error;
+            if (data) setNegotiationSessions(prev => [...prev, data as NegotiationSession]);
+            return data as NegotiationSession;
+        },
+        addNegotiationMessage: async (sessionId, message) => {
+            const session = negotiationSessions.find(s => s.id === sessionId);
+            if (!session) return;
+            const newHistory = [...session.history, message];
+            const { data, error } = await supabase.from('negotiation_sessions').update({ history: newHistory }).eq('id', sessionId).select().single();
+            if (error) throw error;
+            if (data) setNegotiationSessions(prev => prev.map(s => s.id === sessionId ? data as NegotiationSession : s));
+        },
+        addDonationToCampaign: async (campaignId, amount) => {
+            const { error } = await supabase.rpc('add_donation', { c_id: campaignId, d_amount: amount });
+            if (error) throw error;
+            setCampaigns(prev => prev.map(c => c.id === campaignId ? { ...c, current_amount: c.current_amount + amount, donors: c.donors + 1 } : c));
+        },
+        addCampaign: async (campaignData) => {
+            const { data, error } = await supabase.from('campaigns').insert(campaignData).select().single();
+            if (error) throw error;
+            if(data) setCampaigns(prev => [...prev, data as Campaign]);
+            return data as Campaign;
+        },
+        updateCampaign: async (campaignId, updatedData) => {
+            const { data, error } = await supabase.from('campaigns').update(updatedData).eq('id', campaignId).select().single();
+            if (error) throw error;
+            if (data) setCampaigns(prev => prev.map(c => c.id === campaignId ? data as Campaign : c));
+        },
+        deleteCampaign: async (campaignId) => {
+            const { error } = await supabase.from('campaigns').delete().eq('id', campaignId);
+            if (error) throw error;
+            setCampaigns(prev => prev.filter(c => c.id !== campaignId));
+        },
+    }), [
+        users, ads, externalAds, settings, categories, provinces, reviews, notifications,
+        rfqs, offers, featureFlags, auctions, personalizedOffers, stockWatches, marketBriefs,
+        systemHealth, suspiciousActivities, opportunities, dealMemos, smartPayments, negotiationSessions,
+        conversations, messages, campaigns,
+        isDataLoaded, connectionStatus, fetchData
+    ]);
     
     return (
         <AdminContext.Provider value={contextValue}>
