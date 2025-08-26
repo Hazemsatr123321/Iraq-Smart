@@ -191,11 +191,16 @@ const AppContent: React.FC = () => {
     }, []);
     
      useEffect(() => {
+        if (authEvent === 'SIGNED_IN') {
+            addToast('تم تأكيد بريدك الإلكتروني وتسجيل دخولك بنجاح!', 'success');
+            handleNavigation('/');
+            setAuthEvent(null);
+        }
         if (authEvent === 'PASSWORD_RECOVERY') {
             handleNavigation('/reset-password');
             setAuthEvent(null);
         }
-    }, [authEvent, handleNavigation, setAuthEvent]);
+    }, [authEvent, handleNavigation, setAuthEvent, addToast]);
 
     useEffect(() => {
         if (pageKey === location) return;

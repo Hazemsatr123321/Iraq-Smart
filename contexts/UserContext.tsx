@@ -2,6 +2,7 @@
 import React, { createContext, useState, useContext, ReactNode, useCallback, useEffect } from 'react';
 import type { User, UserRole } from '../types';
 import { useAdmin } from './AdminContext';
+import { supabase } from '../services/supabaseClient';
 
 interface RegisterData {
   name: string;
@@ -37,81 +38,109 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-// Hardcoded passwords for mock users for demonstration
-const MOCK_PASSWORDS: Record<string, string> = {
-    'admin@example.com': 'hazemsatr1',
-};
-
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [impersonatingAdminId, setImpersonatingAdminId] = useState<string | null>(null);
-  const [isInitialized, setIsInitialized] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [authEvent, setAuthEvent] = useState<any | null>(null);
-  const { users, addUser, updateUser } = useAdmin();
+  const { users, addUser, updateUser, loadUserById } = useAdmin();
+
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log('onAuthStateChange', event, session);
+        setAuthEvent(event);
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+            if (session?.user) {
+                const userProfile = await loadUserById(session.user.id);
+                setCurrentUser(userProfile as User | null);
+            }
+        } else if (event === 'SIGNED_OUT') {
+            setCurrentUser(null);
+        }
+        setIsInitialized(true);
+    });
+
+    // Handle initial session
+    const initializeSession = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+            const userProfile = await loadUserById(session.user.id);
+            setCurrentUser(userProfile as User | null);
+        }
+        setIsInitialized(true);
+    };
+
+    initializeSession();
+
+    return () => {
+        authListener.subscription.unsubscribe();
+    };
+}, [loadUserById]);
 
   const login = async (email: string, password: string): Promise<User> => {
-    console.log(`Attempting login for ${email}`);
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message);
+    if (!data.user) throw new Error("Login failed: No user data returned.");
+
+    const userProfile = await loadUserById(data.user.id);
+    if (!userProfile) throw new Error("Login failed: Could not find user profile.");
     
-    // Simulate password check
-    if (user && MOCK_PASSWORDS[user.email] === password) {
-        console.log("Login successful", user);
-        setCurrentUser(user);
-        return user;
-    } else {
-        console.log("Login failed");
-        throw new Error("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
-    }
+    setCurrentUser(userProfile as User);
+    return userProfile as User;
   };
   
   const webAuthnLogin = async (): Promise<User> => {
-    throw new Error("Biometric login is not available in mock mode.");
+    throw new Error("Biometric login is not implemented yet.");
   };
 
   const logout = async () => {
+    await supabase.auth.signOut();
     setCurrentUser(null);
     setImpersonatingAdminId(null);
   };
   
   const resetPassword = async (email: string) => {
-    console.log(`Password reset requested for ${email}. In a real app, an email would be sent.`);
-    // In mock mode, we just show a success message.
-    return Promise.resolve();
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin, // Or a specific password reset page
+    });
+    if (error) throw new Error(error.message);
   };
   
   const changePassword = async (newPassword: string) => {
-    if (!currentUser) throw new Error("No user logged in.");
-    console.log(`Password for ${currentUser.email} changed to ${newPassword}.`);
-    MOCK_PASSWORDS[currentUser.email] = newPassword; // Update mock password
-    return Promise.resolve();
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw new Error(error.message);
   };
 
   const register = async (userData: RegisterData, referrerCode?: string): Promise<User> => {
-    if (users.some(u => u.email.toLowerCase() === userData.email.toLowerCase())) {
-        throw new Error("هذا البريد الإلكتروني مسجل بالفعل.");
-    }
-
-    const newUserPayload: Omit<User, 'id'> = {
+    if(!userData.password) throw new Error("Password is required for registration.");
+    const { data: authData, error: authError } = await supabase.auth.signUp({
         email: userData.email,
-        name: userData.name,
-        role: userData.role,
-        profile_picture: userData.profile_picture,
-        store_name: userData.store_name,
-        contact: userData.contact,
-        favorite_ad_ids: [],
-        watched_ad_ids: [],
-        reputation: 'New Seller',
-        is_verified: false,
-        referral_code: `${userData.name.toUpperCase().slice(0,4)}${Math.floor(Math.random() * 1000)}`,
-        referrals: [],
-        available_feature_rewards: 0,
-    }
+        password: userData.password,
+        options: {
+            data: {
+                name: userData.name,
+                role: userData.role,
+                profile_picture: userData.profile_picture,
+                store_name: userData.store_name,
+                contact: userData.contact,
+                referral_code: `${userData.name.toUpperCase().slice(0,4)}${Math.floor(Math.random() * 1000)}`,
+                referred_by: referrerCode || null,
+            }
+        }
+    });
 
-    const newUser = await addUser(newUserPayload);
-    // @ts-ignore
-    MOCK_PASSWORDS[newUser.email] = userData.password; // Add password for new user
-    setCurrentUser(newUser);
-    return newUser;
+    if (authError) throw new Error(authError.message);
+    if (!authData.user) throw new Error("Registration failed: No user data returned.");
+
+    // We assume a trigger on the auth.users table will create the public user profile.
+    // We can then fetch this profile.
+    const newUserProfile = await loadUserById(authData.user.id);
+    if (!newUserProfile) throw new Error("Could not retrieve user profile after registration.");
+
+    // No need to set current user here, onAuthStateChange will handle it after email confirmation.
+    alert("تم إرسال رابط التأكيد إلى بريدك الإلكتروني. يرجى التحقق من بريدك لتفعيل حسابك.");
+
+    return newUserProfile as User;
   };
 
   const toggleFavorite = async (adId: string) => {
@@ -121,9 +150,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       ? currentUser.favorite_ad_ids.filter(id => id !== adId)
       : [...currentUser.favorite_ad_ids, adId];
     
-    const updatedUser = { ...currentUser, favorite_ad_ids: newFavoriteIds };
     await updateUser(currentUser.id, { favorite_ad_ids: newFavoriteIds });
-    setCurrentUser(updatedUser);
+    setCurrentUser({ ...currentUser, favorite_ad_ids: newFavoriteIds });
   };
   
   const toggleWatchAd = async (adId: string) => {
@@ -133,13 +161,12 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       ? currentUser.watched_ad_ids.filter(id => id !== adId)
       : [...currentUser.watched_ad_ids, adId];
       
-    const updatedUser = { ...currentUser, watched_ad_ids: newWatchedAdIds };
     await updateUser(currentUser.id, { watched_ad_ids: newWatchedAdIds });
-    setCurrentUser(updatedUser);
+    setCurrentUser({ ...currentUser, watched_ad_ids: newWatchedAdIds });
   };
   
   const impersonate = (userToImpersonate: User) => {
-    if (currentUser) {
+    if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'moderator')) {
         setImpersonatingAdminId(currentUser.id);
         setCurrentUser(userToImpersonate);
     }
@@ -147,8 +174,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const stopImpersonating = async () => {
     if (impersonatingAdminId) {
-        const adminProfile = users.find(u => u.id === impersonatingAdminId);
-        setCurrentUser(adminProfile || null);
+        const adminProfile = await loadUserById(impersonatingAdminId);
+        setCurrentUser(adminProfile as User | null);
         setImpersonatingAdminId(null);
     }
   };
