@@ -15,7 +15,7 @@ import { ShieldCheckIcon } from '../components/icons/ShieldCheckIcon';
 import { StarIcon } from '../components/icons/StarIcon';
 import { HandHeartIcon } from '../components/icons/HandHeartIcon';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
-import { uploadAdImage, deleteAdImage } from '../../services/storageService';
+import { uploadAdImage, deleteAdImage } from '../services/storageService';
 
 const STEPS = ['التفاصيل', 'البيع', 'الصور', 'المراجعة'];
 
