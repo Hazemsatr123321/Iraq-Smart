@@ -74,6 +74,32 @@ begin
 end;
 $$ language plpgsql security definer;
 
+-- Function to check for suspicious chat message activity
+create or replace function check_suspicious_messages(sender_id_param uuid)
+returns void as $$
+declare
+  message_count integer;
+begin
+  -- Count messages sent by the user in the last 5 minutes
+  select count(*)
+  into message_count
+  from messages
+  where
+    sender_id = sender_id_param and
+    "timestamp" > (now() - interval '5 minutes');
+
+  -- If count exceeds threshold, log it as suspicious
+  if message_count > 20 then
+    insert into suspicious_activities (description, related_user_id, priority)
+    values (
+      'User sent ' || message_count || ' messages in the last 5 minutes.',
+      sender_id_param,
+      'medium'
+    );
+  end if;
+end;
+$$ language plpgsql security definer;
+
 -- Function to check for suspicious RFQ creation activity
 create or replace function check_suspicious_rfqs(user_id_param uuid)
 returns void as $$

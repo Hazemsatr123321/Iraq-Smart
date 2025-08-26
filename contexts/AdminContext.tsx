@@ -339,7 +339,16 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             console.error('Error adding message:', error);
             throw error;
         }
-        setMessages(prev => [...prev, data as ChatMessageDbRow]);
+
+        if (data) {
+            setMessages(prev => [...prev, data as ChatMessageDbRow]);
+            // Check for suspicious activity
+            const { error: rpcError } = await supabase.rpc('check_suspicious_messages', { sender_id_param: data.sender_id });
+            if (rpcError) {
+                console.error('Error checking for suspicious messages:', rpcError);
+            }
+        }
+
         return data as ChatMessageDbRow;
     };
 
