@@ -1,0 +1,45 @@
+{
+  "short_name": "سوق الذكي",
+  "name": "سوق العراق الذكي",
+  "description": "تطبيق إعلانات مبوبة PWA مبتكر لسوق الجملة في العراق، مع إشعارات فورية واختصارات سريعة.",
+  "icons": [
+    {
+      "src": "./icons/icon-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "./icons/icon-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "background_color": "#1a202c",
+  "display": "standalone",
+  "scope": "/",
+  "theme_color": "#1a202c",
+  "shortcuts": [
+    {
+      "name": "إضافة إعلان جديد",
+      "short_name": "إعلان جديد",
+      "description": "إضافة إعلان جديد لبيع بضاعتك",
+      "url": "./#/post",
+      "icons": [{ "src": "./icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "محادثاتي",
+      "short_name": "الرسائل",
+      "description": "عرض رسائلك ومحادثاتك",
+      "url": "./#/chat",
+      "icons": [{ "src": "./icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "إعلاناتي",
+      "short_name": "إعلاناتي",
+      "description": "إدارة إعلاناتك المنشورة",
+      "url": "./#/profile/?tab=myAds",
+      "icons": [{ "src": "./icons/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="./icons/icon-192x192.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#1a202c" />
+    <link rel="manifest" href="./manifest.json" />
+    <title>سوق العراق الذكي</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              'tajawal': ['Tajawal', 'sans-serif'],
+            },
+            colors: {
+              'brand-primary': 'var(--color-bg-primary)',
+              'brand-secondary': 'var(--color-bg-secondary)',
+              'brand-accent': 'var(--color-accent)',
+              'brand-accent-hover': 'var(--color-accent-hover)',
+              'brand-text': 'var(--color-text-primary)',
+              'brand-text-secondary': 'var(--color-text-secondary)',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      :root {
+        /* Light Theme */
+        --color-bg-primary: #ffffff;
+        --color-bg-secondary: #f0f2f5;
+        --color-accent: #b7943c;
+        --color-accent-hover: #a58536;
+        --color-text-primary: #1a202c;
+        --color-text-secondary: #4a5568;
+        --special-bg: #f0f2f5;
+      }
+      .dark {
+        /* Dark Theme */
+        --color-bg-primary: #1a202c;
+        --color-bg-secondary: #2d3748;
+        --color-accent: #c5a34f;
+        --color-accent-hover: #b7943c;
+        --color-text-primary: #f7fafc;
+        --color-text-secondary: #a0aec0;
+        --special-bg: #161a22;
+      }
+
+      body {
+        font-family: 'Tajawal', sans-serif;
+        background-color: var(--special-bg);
+        color: var(--color-text-primary);
+        transition: background-color 0.3s ease, color 0.3s ease;
+      }
+      .dark body {
+         background-image: radial-gradient(circle at top, rgba(45, 55, 72, 0.2), transparent 40%);
+         background-repeat: no-repeat;
+      }
+      .luxury-homepage-bg {
+        background-color: var(--color-bg-primary);
+      }
+      .dark .luxury-homepage-bg {
+        background-color: #12151c;
+        background-image: 
+          radial-gradient(ellipse at 70% 30%, rgba(197, 163, 79, 0.1), transparent 50%),
+          radial-gradient(ellipse at 30% 70%, rgba(45, 55, 72, 0.2), transparent 50%);
+        overflow: hidden;
+      }
+      .social-support-bg {
+        background-color: var(--color-bg-primary);
+      }
+      .dark .social-support-bg {
+        background-color: #12151c;
+        background-image: 
+            radial-gradient(ellipse at 50% 0%, rgba(197, 163, 79, 0.1), transparent 70%);
+      }
+
+      .text-gradient-gold {
+        background: linear-gradient(45deg, #e4c57a, #c5a34f, #ffecb3, #c5a34f);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-size: 200% 200%;
+        animation: gradient-animation 5s ease infinite;
+      }
+      .chat-bg {
+        background-color: var(--color-bg-primary);
+      }
+      .dark .chat-bg {
+        background-color: #12151c;
+        background-image: 
+          radial-gradient(circle at 1% 1%, rgba(45, 55, 72, 0.3) 1px, transparent 1px),
+          radial-gradient(circle at 99% 99%, rgba(45, 55, 72, 0.3) 1px, transparent 1px);
+        background-size: 30px 30px;
+      }
+      @keyframes gradient-animation {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translate3d(0, 30px, 0);
+        }
+        to {
+          opacity: 1;
+          transform: translate3d(0, 0, 0);
+        }
+      }
+      @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(50px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+      }
+      .animate-fadeInUp {
+        animation: fadeInUp 0.6s ease-out both;
+      }
+       .animate-slideIn {
+        animation: slideIn 0.5s ease-out both;
+      }
+      @keyframes modal-glow {
+        0% { box-shadow: 0 0 8px 0px rgba(197, 163, 79, 0.2), inset 0 0 6px 0px rgba(197, 163, 79, 0.1); }
+        50% { box-shadow: 0 0 24px 3px rgba(197, 163, 79, 0.5), inset 0 0 12px 2px rgba(197, 163, 79, 0.3); }
+        100% { box-shadow: 0 0 8px 0px rgba(197, 163, 79, 0.2), inset 0 0 6px 0px rgba(197, 163, 79, 0.1); }
+      }
+      .modal-glow-animation {
+        animation: modal-glow 5s ease-in-out infinite;
+      }
+      .stagger-children > * {
+        animation: fadeInUp 0.7s ease-out both;
+      }
+
+      /* Page Transitions */
+      @keyframes page-enter {
+        from { opacity: 0; transform: scale(0.99); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      @keyframes page-exit {
+        from { opacity: 1; transform: scale(1); }
+        to { opacity: 0; transform: scale(0.99); }
+      }
+      .animate-page-enter {
+        animation: page-enter 0.3s ease-out forwards;
+      }
+      .animate-page-exit {
+        animation: page-exit 0.3s ease-in forwards;
+      }
+
+      /* Swipe Back Gesture Styles */
+      .page-container {
+        transition: transform 0.3s ease-out;
+      }
+      .page-container.swiping {
+        transition: none;
+      }
+    </style>
+     <style>
+      :root {
+        --safe-area-inset-top: env(safe-area-inset-top, 0px);
+        --safe-area-inset-right: env(safe-area-inset-right, 0px);
+        --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+        --safe-area-inset-left: env(safe-area-inset-left, 0px);
+      }
+      body {
+        -webkit-tap-highlight-color: transparent;
+      }
+      /* Hide scrollbar for Chrome, Safari and Opera */
+      body::-webkit-scrollbar {
+        display: none;
+      }
+      /* Hide scrollbar for IE, Edge and Firefox */
+      body {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.1.1/",
+    "react": "https://esm.sh/react@^19.1.1",
+    "@google/genai": "https://esm.sh/@google/genai@^1.12.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.1/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
