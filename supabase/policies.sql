@@ -107,3 +107,13 @@ commit;
 -- add the tables you want to listen to
 alter publication supabase_realtime add table messages;
 alter publication supabase_realtime add table conversations;
+
+
+-- ========= PROFILE UPDATE LOGS TABLE =========
+-- 1. Enable RLS
+ALTER TABLE public.profile_update_logs ENABLE ROW LEVEL SECURITY;
+
+-- 2. Create Policies
+-- This table should only be written to by the `log_and_check_profile_update` function, which is a security definer.
+-- No user should be able to select, insert, update, or delete from it directly.
+CREATE POLICY "Deny all access" ON public.profile_update_logs FOR ALL USING (false) WITH CHECK (false);

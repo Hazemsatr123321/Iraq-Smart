@@ -325,6 +325,13 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
     
     const updateUser = async (userId: string, updatedData: Partial<Omit<User, 'id'>>) => {
+        if (updatedData.store_name || updatedData.contact) {
+            const { error: rpcError } = await supabase.rpc('log_and_check_profile_update', { user_id_param: userId });
+            if (rpcError) {
+                console.error('Error logging profile update:', rpcError);
+            }
+        }
+
         const { data, error } = await supabase.from('users').update(updatedData).eq('id', userId).select().single();
         if (error) {
             console.error('Error updating user:', error);

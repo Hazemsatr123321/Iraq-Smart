@@ -74,6 +74,35 @@ begin
 end;
 $$ language plpgsql security definer;
 
+-- Function to log a profile update and check for suspicious frequency
+create or replace function log_and_check_profile_update(user_id_param uuid)
+returns void as $$
+declare
+  update_count integer;
+begin
+  -- Log the update event
+  insert into public.profile_update_logs (user_id) values (user_id_param);
+
+  -- Count profile updates by the user in the last 24 hours
+  select count(*)
+  into update_count
+  from profile_update_logs
+  where
+    user_id = user_id_param and
+    created_at > (now() - interval '24 hours');
+
+  -- If count exceeds threshold, log it as suspicious
+  if update_count > 2 then
+    insert into suspicious_activities (description, related_user_id, priority)
+    values (
+      'User updated their profile ' || update_count || ' times in the last 24 hours.',
+      user_id_param,
+      'medium'
+    );
+  end if;
+end;
+$$ language plpgsql security definer;
+
 -- Function to check for suspicious chat message activity
 create or replace function check_suspicious_messages(sender_id_param uuid)
 returns void as $$
