@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@google/genai": "^1.12.0",
+    "@simplewebauthn/browser": "^13.1.2",
+    "@simplewebauthn/server": "^13.1.2",
     "@supabase/supabase-js": "^2.56.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"

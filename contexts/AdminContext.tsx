@@ -38,6 +38,7 @@ interface AppState {
 interface AdminContextType extends AppState {
   settings: AppSettings;
   isDataLoaded: boolean;
+  addNewMessage: (message: ChatMessageDbRow) => void;
   addAd: (newAd: Tables['ads']['Insert'], userId: string) => Promise<Tables['ads']['Row']>;
   updateAd: (adId: string, updatedData: Tables['ads']['Update']) => Promise<void>;
   deleteAd: (adId: string) => Promise<void>;
@@ -80,8 +81,8 @@ interface AdminContextType extends AppState {
   toggleFeatureFlag: (featureId: string) => Promise<void>;
   stats: any;
   getPricingAnalysis: (productName: string, userId: string) => { myPrice: number | null; competitorPrices: number[] };
-  getDemandHotspots: () => { province: string; count: number }[];
-  getProductOpportunities: () => { productName: string; demand: number; supply: number }[];
+  getDemandHotspots: () => Promise<{ province: string; count: number }[]>;
+  getProductOpportunities: () => Promise<{ productName: string; demand: number; supply: number }[]>;
   getOpportunitiesForUser: (user: User) => Opportunity[];
   getAuctionById: (auctionId: string) => Auction | undefined;
   placeBid: (auctionId: string, amount: number, userId: string) => Promise<void>;
@@ -98,7 +99,7 @@ interface AdminContextType extends AppState {
   addShippingInfoToPayment: (paymentId: string, shippingInfo: { company: string; tracking_number: string; }) => Promise<void>;
   raiseDispute: (paymentId: string, reason: string) => Promise<void>;
   resolveDispute: (paymentId: string, resolution: 'refund' | 'payout') => Promise<void>;
-  calculatePartnershipScore: (userId1: string, userId2: string) => { dealCount: number; avgRating: number; };
+  calculatePartnershipScore: (userId1: string, userId2: string) => Promise<{ dealCount: number; avgRating: number; }>;
   grantReferralReward: (userId: string) => Promise<void>;
   applyFreeFeature: (adId: string, userId: string) => Promise<void>;
   addNegotiationSession: (sessionData: Omit<NegotiationSession, 'id'>) => Promise<NegotiationSession>;
@@ -148,6 +149,10 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [conversations, setConversations] = useState<ChatConversation[]>([]);
     const [messages, setMessages] = useState<ChatMessageDbRow[]>([]);
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+
+    const addNewMessage = (message: ChatMessageDbRow) => {
+        setMessages(prev => [...prev, message]);
+    };
 
     const [isDataLoaded, setIsDataLoaded] = useState(false);
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('online');
@@ -355,6 +360,7 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         isDataLoaded,
         connectionStatus,
         retryConnection: fetchData,
+        addNewMessage,
         addAd,
         updateAd,
         deleteAd,
@@ -578,8 +584,24 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (error) throw error;
             if (data) setFeatureFlags(prev => prev.map(f => f.id === featureId ? data as FeatureFlag : f));
         },
-        getPricingAnalysis: () => ({ myPrice: null, competitorPrices: [] }), getDemandHotspots: () => [],
-        getProductOpportunities: () => [], getOpportunitiesForUser: () => [],
+        getPricingAnalysis: () => ({ myPrice: null, competitorPrices: [] }),
+        getDemandHotspots: async () => {
+            const { data, error } = await supabase.rpc('get_demand_hotspots');
+            if (error) {
+                console.error('Error fetching demand hotspots:', error);
+                return [];
+            }
+            return data;
+        },
+        getProductOpportunities: async () => {
+            const { data, error } = await supabase.rpc('get_product_opportunities');
+            if (error) {
+                console.error('Error fetching product opportunities:', error);
+                return [];
+            }
+            return data;
+        },
+        getOpportunitiesForUser: () => [],
         getAuctionById: (auctionId: string) => auctions.find(a => a.id === auctionId),
         addRfq: async (rfqData, userId) => {
             const { data, error } = await supabase.from('rfqs').insert({ ...rfqData, user_id: userId, status: 'open' }).select().single();
@@ -635,7 +657,17 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         resolveDispute: async (paymentId, resolution) => {
             await updateSmartPaymentStatus(paymentId, 'completed', `Dispute resolved: ${resolution}`);
         },
-        calculatePartnershipScore: () => ({ dealCount: 0, avgRating: 0 }), // Placeholder for complex logic
+        calculatePartnershipScore: async (userId1, userId2) => {
+            const { data, error } = await supabase.rpc('calculate_partnership_score', {
+                user_id_1: userId1,
+                user_id_2: userId2,
+            });
+            if (error) {
+                console.error('Error calculating partnership score:', error);
+                return { dealCount: 0, avgRating: 0 };
+            }
+            return data[0] || { dealCount: 0, avgRating: 0 };
+        },
         grantReferralReward: async (userId) => {
             const user = users.find(u => u.id === userId);
             if(user) await updateUser(userId, { available_feature_rewards: (user.available_feature_rewards || 0) + 1 });

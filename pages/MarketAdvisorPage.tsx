@@ -74,14 +74,14 @@ export const MarketAdvisorPage: React.FC<{ onNavigate: (path: string) => void }>
             }
         }
       } else if (type === 'demand') {
-        const hotspots = getDemandHotspots();
+        const hotspots = await getDemandHotspots();
         if(hotspots.length === 0) {
             result = 'لا توجد بيانات طلب كافية في الوقت الحالي لتقديم تحليل دقيق.';
         } else {
             result = await generateDemandAdvice(hotspots);
         }
       } else if (type === 'opportunity') {
-        const opportunities = getProductOpportunities();
+        const opportunities = await getProductOpportunities();
          if(opportunities.length === 0) {
             result = 'يبدو أن السوق متوازن حالياً. لا توجد فجوات واضحة بين العرض والطلب.';
         } else {

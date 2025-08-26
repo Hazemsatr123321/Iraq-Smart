@@ -90,6 +90,49 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
   
   const webAuthnLogin = async (): Promise<User> => {
+    /*
+    * =============================================
+    * WebAuthn (Biometric Login) Implementation Guide
+    * =============================================
+    * This feature requires a full client-server implementation.
+    *
+    * Recommended Libraries:
+    * - Client: @simplewebauthn/browser
+    * - Server: @simplewebauthn/server (to be used in Supabase Edge Functions)
+    *
+    * --- Registration Flow (e.g., on a user's Account page) ---
+    * 1. Client: User clicks "Register Biometrics".
+    * 2. Client: Call a Supabase Edge Function `webauthn-registration-challenge`.
+    * 3. Server (Edge Function):
+    *    - Use `@simplewebauthn/server`'s `generateRegistrationOptions`.
+    *    - Required info: `rpName`, `rpID` (relying party ID, e.g., your domain), `userID`, `userName`.
+    *    - Exclude credentials the user has already registered.
+    *    - Store the generated challenge in the user's session or a temporary table.
+    *    - Return the options to the client.
+    * 4. Client:
+    *    - Use `@simplewebauthn/browser`'s `startRegistration()` with the options from the server.
+    *    - This will prompt the user for their biometrics.
+    * 5. Client: Send the result of `startRegistration()` to another Edge Function `webauthn-registration-verification`.
+    * 6. Server (Edge Function):
+    *    - Use `@simplewebauthn/server`'s `verifyRegistrationResponse()`.
+    *    - If verification is successful, store the new credential details (credentialID, publicKey, counter, transports) in the `users` table (e.g., in the `webauthn_credentials` JSONB[] column).
+    *
+    * --- Login Flow (this function) ---
+    * 1. Client: User clicks the "Login with Biometrics" button.
+    * 2. Client: Call a Supabase Edge Function `webauthn-login-challenge`.
+    * 3. Server (Edge Function):
+    *    - Use `@simplewebauthn/server`'s `generateAuthenticationOptions()`.
+    *    - Allow credentials from the user's registered credentials in the database.
+    *    - Store the challenge.
+    *    - Return options to the client.
+    * 4. Client:
+    *    - Use `@simplewebauthn/browser`'s `startAuthentication()` with the server options.
+    * 5. Client: Send the result to an Edge Function `webauthn-login-verification`.
+    * 6. Server (Edge Function):
+    *    - Use `@simplewebauthn/server`'s `verifyAuthenticationResponse()`.
+    *    - If successful, the user is authenticated. Create a new Supabase session for them.
+    *    - The `onAuthStateChange` listener in this context will then pick up the new session.
+    */
     throw new Error("Biometric login is not implemented yet.");
   };
 

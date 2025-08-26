@@ -19,7 +19,7 @@ CREATE TABLE users (
     referrals UUID[],
     available_feature_rewards INTEGER DEFAULT 0,
     pending_referral_reward BOOLEAN DEFAULT false,
-    web_authn_credential_id TEXT,
+    webauthn_credentials JSONB[],
     created_at TIMESTAMPTZ DEFAULT now()
 );
 

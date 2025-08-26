@@ -1,8 +1,10 @@
 import React, { createContext, useState, useContext, ReactNode, useCallback, useEffect } from 'react';
+import { RealtimeChannel } from '@supabase/supabase-js';
 import type { ChatConversation, ChatMessage, Ad, NegotiationSession, DealMemo, NegotiationMessage, TextChatMessage, MessageStatus, ChatMessageDbRow } from '../types';
 import { useUser } from './UserContext';
 import { useAdmin } from './AdminContext';
 import { generateDealMemoFromChat } from '../services/geminiService';
+import { supabase } from '../services/supabaseClient';
 
 interface ChatContextType {
   conversations: ChatConversation[];
@@ -25,6 +27,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const { 
       conversations,
       messages,
+      addNewMessage,
       addDealMemo: adminAddDealMemo, 
       updateDealMemo: adminUpdateDealMemo,
       negotiationSessions,
@@ -57,7 +60,31 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }, 0);
     setUnreadCount(unread);
 
-  }, [currentUser, conversations, messages]);
+    // --- Realtime Subscriptions ---
+    const channels: RealtimeChannel[] = [];
+    myConversations.forEach(conv => {
+        const channel = supabase.channel(`messages:${conv.id}`)
+            .on<ChatMessageDbRow>(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conv.id}` },
+                (payload) => {
+                    console.log('New message received!', payload.new);
+                    // Add the new message to the global state in AdminContext
+                    addNewMessage(payload.new);
+                    // Also update the last_message in the conversation locally for instant UI update
+                    updateConversationLastMessage(conv.id, payload.new as ChatMessage);
+                }
+            )
+            .subscribe();
+        channels.push(channel);
+    });
+
+    return () => {
+        console.log("Cleaning up chat subscriptions");
+        channels.forEach(channel => supabase.removeChannel(channel));
+    };
+
+  }, [currentUser, conversations, messages, addNewMessage, updateConversationLastMessage]);
 
   const getMessagesForConversation = useCallback((conversationId: string): ChatMessage[] => {
     // Cast the DB row type to the application's union type.
