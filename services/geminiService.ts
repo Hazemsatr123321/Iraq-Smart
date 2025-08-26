@@ -2,8 +2,12 @@ import { GoogleGenAI, Type, GenerateContentResponse, Part } from "@google/genai"
 import { Ad, RequestForQuotation, MarketAnalysis, NegotiationSession, PartnershipScore } from "../types";
 
 // Initialize the Google AI client with the API key from environment variables.
-// This is the secure and correct way to handle API keys.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// For Vite, environment variables must be prefixed with VITE_ to be exposed to the client.
+const apiKey = import.meta.env.VITE_API_KEY;
+if (!apiKey) {
+  console.error("VITE_API_KEY is not set. AI features will not work.");
+}
+const ai = new GoogleGenAI({ apiKey });
 
 const model = 'gemini-2.5-flash';
 
