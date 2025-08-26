@@ -35,7 +35,8 @@ export type AdminSection =
   | 'ai_tools'
   | 'social_support'
   | 'smart_safepay'
-  | 'negotiations';
+  | 'negotiations'
+  | 'payment';
 
 export interface Ad {
   id: string;
@@ -203,8 +204,6 @@ export interface AppSettings {
     announcement_type: AnnouncementType;
     is_announcement_active: boolean;
     maintenance_mode: boolean;
-    zain_cash_number: string;
-    asia_pay_number: string;
     charity_program_description: string;
     small_projects_program_description: string;
 }
@@ -393,6 +392,16 @@ export interface NegotiationSession {
 export interface PartnershipScore {
   score: number;
   analysis: string;
+}
+
+export interface PaymentMethod {
+  id: string;
+  name: string;
+  details: Json;
+  type: string;
+  is_active_for_features: boolean;
+  is_active_for_donations: boolean;
+  created_at: string;
 }
 
 export interface Campaign {

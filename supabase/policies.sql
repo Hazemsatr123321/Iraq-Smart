@@ -117,3 +117,17 @@ ALTER TABLE public.profile_update_logs ENABLE ROW LEVEL SECURITY;
 -- This table should only be written to by the `log_and_check_profile_update` function, which is a security definer.
 -- No user should be able to select, insert, update, or delete from it directly.
 CREATE POLICY "Deny all access" ON public.profile_update_logs FOR ALL USING (false) WITH CHECK (false);
+
+
+-- ========= PAYMENT METHODS TABLE =========
+-- 1. Enable RLS
+ALTER TABLE public.payment_methods ENABLE ROW LEVEL SECURITY;
+
+-- 2. Create Policies
+-- Admins can manage payment methods.
+CREATE POLICY "Allow admins full access to payment methods" ON public.payment_methods FOR ALL
+USING (auth.role() = 'admin')  WITH CHECK (auth.role() = 'admin');
+
+-- Authenticated users can read active payment methods.
+CREATE POLICY "Allow users to read active payment methods" ON public.payment_methods FOR SELECT
+USING (auth.role() = 'authenticated');

@@ -23,6 +23,17 @@ CREATE TABLE users (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Payment Methods Table
+CREATE TABLE payment_methods (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    details JSONB, -- e.g., { "number": "078..." } or { "iban": "IQ...", "account_name": "..." }
+    type TEXT, -- e.g., 'mobile_wallet', 'bank_transfer'
+    is_active_for_features BOOLEAN DEFAULT false,
+    is_active_for_donations BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- Ads Table
 CREATE TABLE ads (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

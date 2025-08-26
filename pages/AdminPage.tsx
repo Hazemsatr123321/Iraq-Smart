@@ -19,9 +19,10 @@ import { AITools } from '../components/admin/AITools';
 import { SocialSupportManagement } from '../components/admin/SocialSupportManagement';
 import { SmartSafePayManagement } from '../components/admin/SmartSafePayManagement';
 import { NegotiationManagement } from '../components/admin/NegotiationManagement';
+import { PaymentManagement } from '../components/admin/PaymentManagement';
 
 const permissions: Record<UserRole, string[]> = {
-    admin: ['dashboard', 'users', 'ads', 'reviews', 'financials', 'ai_tools', 'features', 'content', 'external_ads', 'settings', 'social_support', 'smart_safepay', 'negotiations'],
+    admin: ['dashboard', 'users', 'ads', 'reviews', 'financials', 'ai_tools', 'features', 'content', 'external_ads', 'settings', 'social_support', 'smart_safepay', 'negotiations', 'payment'],
     moderator: ['dashboard', 'ads', 'reviews'],
     support: ['dashboard', 'users'],
     wholesaler: [],
@@ -87,6 +88,7 @@ export const AdminPage: React.FC<{ onNavigate: (path: string, section?: AdminSec
             case 'features': return <FeatureManagement />;
             case 'external_ads': return <ExternalAdManagement />;
             case 'settings': return <AppSettings />;
+            case 'payment': return <PaymentManagement />;
             default: return <Dashboard />;
         }
     }

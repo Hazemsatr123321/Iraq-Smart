@@ -35,10 +35,11 @@ const allSections = [
     { key: 'content', name: 'إدارة المحتوى', icon: <DatabaseIcon className="w-5 h-5"/> },
     { key: 'external_ads', name: 'إعلانات الشركات', icon: <ImageIcon className="w-5 h-5"/> },
     { key: 'settings', name: 'إعدادات التطبيق', icon: <SettingsIcon className="w-5 h-5"/> },
+    { key: 'payment', name: 'إدارة طرق الدفع', icon: <DollarSignIcon className="w-5 h-5"/> },
 ];
 
 const permissions: Record<UserRole, string[]> = {
-    admin: ['dashboard', 'users', 'ads', 'reviews', 'financials', 'ai_tools', 'features', 'content', 'external_ads', 'settings', 'social_support', 'smart_safepay', 'negotiations'],
+    admin: ['dashboard', 'users', 'ads', 'reviews', 'financials', 'ai_tools', 'features', 'content', 'external_ads', 'settings', 'social_support', 'smart_safepay', 'negotiations', 'payment'],
     moderator: ['dashboard', 'ads', 'reviews'],
     support: ['dashboard', 'users'],
     wholesaler: [],

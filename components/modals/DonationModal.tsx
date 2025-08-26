@@ -38,11 +38,11 @@ interface DonationModalProps {
   addToast: (message: string, type?: ToastType) => void;
 }
 
-type PaymentMethod = 'zain' | 'asia';
-
 export const DonationModal: React.FC<DonationModalProps> = ({ campaign, onClose, addToast }) => {
-  const { settings, addDonationToCampaign } = useAdmin();
-  const [activeMethod, setActiveMethod] = useState<PaymentMethod>('zain');
+  const { paymentMethods, addDonationToCampaign } = useAdmin();
+  const activeDonationMethods = paymentMethods.filter(p => p.is_active_for_donations);
+
+  const [activeMethodId, setActiveMethodId] = useState<string | null>(activeDonationMethods[0]?.id || null);
   const [amount, setAmount] = useState('');
   const [transactionId, setTransactionId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -73,11 +73,20 @@ export const DonationModal: React.FC<DonationModalProps> = ({ campaign, onClose,
   };
 
   const renderPaymentContent = () => {
-    const number = activeMethod === 'zain' ? settings.zain_cash_number : settings.asia_pay_number;
+    const method = activeDonationMethods.find(m => m.id === activeMethodId);
+    if (!method) return <p className="text-center text-brand-text-secondary">الرجاء اختيار طريقة دفع.</p>;
+
+    const details = method.details as { number?: string, account_name?: string, iban?: string };
+    const infoToCopy = details.number || details.iban || '';
+
     return (
         <div className="flex items-center justify-between bg-brand-primary/50 p-3 rounded-lg">
-            <p className="font-mono text-xl md:text-2xl text-brand-accent">{number}</p>
-            <CopyButton textToCopy={number} />
+            <div className="text-right">
+                {details.account_name && <p className="text-sm">{details.account_name}</p>}
+                {details.number && <p className="font-mono text-xl text-brand-accent">{details.number}</p>}
+                {details.iban && <p className="font-mono text-sm">{details.iban}</p>}
+            </div>
+            {infoToCopy && <CopyButton textToCopy={infoToCopy} />}
         </div>
     );
   }
@@ -103,13 +112,12 @@ export const DonationModal: React.FC<DonationModalProps> = ({ campaign, onClose,
                  <div className="bg-brand-secondary p-4 rounded-lg">
                     <h3 className="text-lg font-bold text-white mb-2">الخطوة 2: حوّل المبلغ</h3>
                     <p className="text-sm text-brand-text-secondary mb-3">اختر إحدى الطرق التالية لتحويل المبلغ:</p>
-                    <div className="flex justify-center gap-2 bg-brand-primary/50 p-2 rounded-lg mb-4">
-                        <button type="button" onClick={() => setActiveMethod('zain')} className={`flex-1 p-2 rounded-md flex items-center justify-center gap-2 font-bold transition-colors ${activeMethod === 'zain' ? 'bg-brand-accent text-brand-primary' : 'hover:bg-brand-primary/50'}`}>
-                            <ZainCashIcon /> زين كاش
-                        </button>
-                        <button type="button" onClick={() => setActiveMethod('asia')} className={`flex-1 p-2 rounded-md flex items-center justify-center gap-2 font-bold transition-colors ${activeMethod === 'asia' ? 'bg-brand-accent text-brand-primary' : 'hover:bg-brand-primary/50'}`}>
-                            <AsiaPayIcon /> آسيا باي
-                        </button>
+                    <div className="flex justify-center flex-wrap gap-2 bg-brand-primary/50 p-2 rounded-lg mb-4">
+                        {activeDonationMethods.length > 0 ? activeDonationMethods.map(method => (
+                            <button key={method.id} type="button" onClick={() => setActiveMethodId(method.id)} className={`flex-1 p-2 rounded-md flex items-center justify-center gap-2 font-bold transition-colors ${activeMethodId === method.id ? 'bg-brand-accent text-brand-primary' : 'hover:bg-brand-primary/50'}`}>
+                                {method.name}
+                            </button>
+                        )) : <p className="text-brand-text-secondary">لا توجد طرق دفع متاحة حالياً للتبرع.</p>}
                     </div>
                     {renderPaymentContent()}
                 </div>
@@ -117,11 +125,11 @@ export const DonationModal: React.FC<DonationModalProps> = ({ campaign, onClose,
                 <div className="bg-brand-secondary p-4 rounded-lg">
                      <h3 className="text-lg font-bold text-white mb-2">الخطوة 3: تأكيد التحويل</h3>
                     <Input label="أدخل رقم عملية التحويل" value={transactionId} onChange={e => setTransactionId(e.target.value)} required placeholder="معرّف العملية أو رقم هاتف المرسل"/>
-                    <p className="text-xs text-brand-text-secondary mt-1 text-center">يمكنك العثور على هذا الرقم في رسالة تأكيد التحويل من زين كاش أو آسيا باي.</p>
+                    <p className="text-xs text-brand-text-secondary mt-1 text-center">يمكنك العثور على هذا الرقم في رسالة تأكيد التحويل.</p>
                 </div>
                 
                  <div className="pt-2 flex flex-col sm:flex-row gap-4">
-                    <Button type="submit" className="w-full">
+                    <Button type="submit" className="w-full" disabled={!activeMethodId}>
                         تأكيد التبرع
                     </Button>
                     <Button onClick={onClose} variant="secondary" className="w-full">إلغاء</Button>

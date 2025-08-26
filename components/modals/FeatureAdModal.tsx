@@ -22,11 +22,11 @@ interface FeatureAdModalProps {
   addToast: (message: string, type?: ToastType) => void;
 }
 
-type PaymentMethod = 'zain' | 'asia' | 'card';
-
 export const FeatureAdModal: React.FC<FeatureAdModalProps> = ({ ad, onClose, addToast }) => {
-  const { settings } = useAdmin();
-  const [activeMethod, setActiveMethod] = useState<PaymentMethod>('zain');
+  const { settings, paymentMethods } = useAdmin();
+  const activeFeatureMethods = paymentMethods.filter(p => p.is_active_for_features);
+
+  const [activeMethodId, setActiveMethodId] = useState<string | null>(activeFeatureMethods[0]?.id || null);
   const [transactionId, setTransactionId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -34,7 +34,8 @@ export const FeatureAdModal: React.FC<FeatureAdModalProps> = ({ ad, onClose, add
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (activeMethod !== 'card' && !transactionId.trim()) {
+    const selectedMethod = activeFeatureMethods.find(m => m.id === activeMethodId);
+    if (selectedMethod && selectedMethod.type !== 'card' && !transactionId.trim()) {
         addToast("الرجاء إدخال رقم عملية التحويل.", "error");
         return;
     }
@@ -49,35 +50,33 @@ export const FeatureAdModal: React.FC<FeatureAdModalProps> = ({ ad, onClose, add
   };
 
   const renderPaymentContent = () => {
-    switch(activeMethod) {
-        case 'zain':
-            return (
-                <div className="space-y-4">
-                    <p className="text-center">يرجى تحويل مبلغ <strong className="text-brand-accent">{settings.featured_ad_price.toLocaleString()} دينار عراقي</strong> إلى الرقم التالي:</p>
-                    <p className="text-center font-mono text-2xl bg-brand-primary/50 p-3 rounded-lg">{settings.zain_cash_number}</p>
-                    <Input label="أدخل رقم عملية التحويل للتأكيد" value={transactionId} onChange={e => setTransactionId(e.target.value)} required />
+    const method = activeFeatureMethods.find(m => m.id === activeMethodId);
+    if (!method) return <p className="text-center text-brand-text-secondary">الرجاء اختيار طريقة دفع.</p>;
+
+    if (method.type === 'card') {
+         return (
+             <div className="space-y-4">
+                <p className="text-center text-brand-text-secondary">سيتم خصم <strong className="text-brand-accent">{settings.featured_ad_price.toLocaleString()} دينار عراقي</strong> من بطاقتك.</p>
+                <Input label="رقم البطاقة" placeholder="XXXX XXXX XXXX XXXX" />
+                <div className="grid grid-cols-2 gap-4">
+                    <Input label="تاريخ الانتهاء" placeholder="MM/YY" />
+                    <Input label="CVC" placeholder="123" />
                 </div>
-            );
-        case 'asia':
-            return (
-                 <div className="space-y-4">
-                    <p className="text-center">يرجى تحويل مبلغ <strong className="text-brand-accent">{settings.featured_ad_price.toLocaleString()} دينار عراقي</strong> إلى الرقم التالي:</p>
-                    <p className="text-center font-mono text-2xl bg-brand-primary/50 p-3 rounded-lg">{settings.asia_pay_number}</p>
-                    <Input label="أدخل رقم عملية التحويل للتأكيد" value={transactionId} onChange={e => setTransactionId(e.target.value)} required />
-                </div>
-            );
-        case 'card':
-            return (
-                 <div className="space-y-4">
-                    <p className="text-center text-brand-text-secondary">سيتم خصم <strong className="text-brand-accent">{settings.featured_ad_price.toLocaleString()} دينار عراقي</strong> من بطاقتك.</p>
-                    <Input label="رقم البطاقة" placeholder="XXXX XXXX XXXX XXXX" />
-                    <div className="grid grid-cols-2 gap-4">
-                        <Input label="تاريخ الانتهاء" placeholder="MM/YY" />
-                        <Input label="CVC" placeholder="123" />
-                    </div>
-                </div>
-            );
+            </div>
+        );
     }
+
+    const details = method.details as { number?: string, account_name?: string, iban?: string };
+
+    return (
+        <div className="space-y-4 text-center">
+            <p>يرجى تحويل مبلغ <strong className="text-brand-accent">{settings.featured_ad_price.toLocaleString()} دينار عراقي</strong> إلى المعلومات التالية:</p>
+            {details.number && <p className="font-mono text-2xl bg-brand-primary/50 p-3 rounded-lg">{details.number}</p>}
+            {details.account_name && <p>{details.account_name}</p>}
+            {details.iban && <p className="font-mono">{details.iban}</p>}
+            <Input label="أدخل رقم عملية التحويل للتأكيد" value={transactionId} onChange={e => setTransactionId(e.target.value)} required />
+        </div>
+    );
   }
 
   return (
@@ -94,23 +93,19 @@ export const FeatureAdModal: React.FC<FeatureAdModalProps> = ({ ad, onClose, add
             <LoadingSpinner text="جاري تأكيد الدفع..." />
         ) : (
             <form onSubmit={handleSubmit} className="mt-6">
-                <div className="flex justify-center gap-2 bg-brand-secondary/50 p-2 rounded-lg mb-6">
-                    <button type="button" onClick={() => setActiveMethod('zain')} className={`flex-1 p-2 rounded-md flex items-center justify-center gap-2 font-bold transition-colors ${activeMethod === 'zain' ? 'bg-brand-accent text-brand-primary' : 'hover:bg-brand-primary/50'}`}>
-                        <ZainCashIcon /> زين كاش
-                    </button>
-                    <button type="button" onClick={() => setActiveMethod('asia')} className={`flex-1 p-2 rounded-md flex items-center justify-center gap-2 font-bold transition-colors ${activeMethod === 'asia' ? 'bg-brand-accent text-brand-primary' : 'hover:bg-brand-primary/50'}`}>
-                        <AsiaPayIcon /> آسيا باي
-                    </button>
-                    <button type="button" onClick={() => setActiveMethod('card')} className={`flex-1 p-2 rounded-md flex items-center justify-center gap-2 font-bold transition-colors ${activeMethod === 'card' ? 'bg-brand-accent text-brand-primary' : 'hover:bg-brand-primary/50'}`}>
-                        <CreditCardIcon /> بطاقة بنكية
-                    </button>
+                <div className="flex justify-center flex-wrap gap-2 bg-brand-secondary/50 p-2 rounded-lg mb-6">
+                    {activeFeatureMethods.length > 0 ? activeFeatureMethods.map(method => (
+                        <button key={method.id} type="button" onClick={() => setActiveMethodId(method.id)} className={`flex-1 p-2 rounded-md flex items-center justify-center gap-2 font-bold transition-colors ${activeMethodId === method.id ? 'bg-brand-accent text-brand-primary' : 'hover:bg-brand-primary/50'}`}>
+                            {method.name}
+                        </button>
+                    )) : <p className="text-brand-text-secondary">لا توجد طرق دفع متاحة حالياً. يرجى التواصل مع الإدارة.</p>}
                 </div>
                 
                 {renderPaymentContent()}
                 
                 <div className="mt-6 flex gap-4">
-                    <Button type="submit" className="w-full">
-                        {activeMethod === 'card' ? 'ادفع الآن' : 'تأكيد الدفع'}
+                    <Button type="submit" className="w-full" disabled={!activeMethodId}>
+                        تأكيد الدفع
                     </Button>
                     <Button onClick={onClose} variant="secondary" className="w-full">إلغاء</Button>
                 </div>

@@ -33,6 +33,7 @@ interface AppState {
   conversations: Tables['conversations']['Row'][];
   messages: Tables['messages']['Row'][];
   campaigns: Tables['campaigns']['Row'][];
+  paymentMethods: Tables['payment_methods']['Row'][];
 }
 
 interface AdminContextType extends AppState {
@@ -120,6 +121,9 @@ interface AdminContextType extends AppState {
   addCampaign: (campaignData: Omit<Campaign, 'id' | 'current_amount' | 'donors' | 'is_active'>) => Promise<Campaign>;
   updateCampaign: (campaignId: string, updatedData: Partial<Omit<Campaign, 'id'>>) => Promise<void>;
   deleteCampaign: (campaignId: string) => Promise<void>;
+  addPaymentMethod: (method: Tables['payment_methods']['Insert']) => Promise<void>;
+  updatePaymentMethod: (methodId: string, updatedData: Tables['payment_methods']['Update']) => Promise<void>;
+  deletePaymentMethod: (methodId: string) => Promise<void>;
 }
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
@@ -149,6 +153,7 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [conversations, setConversations] = useState<ChatConversation[]>([]);
     const [messages, setMessages] = useState<ChatMessageDbRow[]>([]);
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+    const [paymentMethods, setPaymentMethods] = useState<Tables['payment_methods']['Row'][]>([]);
 
     const addNewMessage = (message: ChatMessageDbRow) => {
         setMessages(prev => [...prev, message]);
@@ -166,7 +171,7 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 reviewsRes, notificationsRes, rfqsRes, offersRes, featureFlagsRes,
                 auctionsRes, personalizedOffersRes, stockWatchesRes, marketBriefsRes,
                 suspiciousActivitiesRes, opportunitiesRes, dealMemosRes, smartPaymentsRes,
-                negotiationSessionsRes, conversationsRes, messagesRes, externalAdsRes, campaignsRes
+                negotiationSessionsRes, conversationsRes, messagesRes, externalAdsRes, campaignsRes, paymentMethodsRes
             ] = await Promise.all([
                 supabase.from('ads').select('*'),
                 supabase.from('users').select('*'),
@@ -191,6 +196,7 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 supabase.from('messages').select('*'),
                 supabase.from('external_ads').select('*'),
                 supabase.from('campaigns').select('*'),
+                supabase.from('payment_methods').select('*'),
             ]);
 
             if (adsRes.data) setAds(adsRes.data as Ad[]);
@@ -216,6 +222,7 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (messagesRes.data) setMessages(messagesRes.data as ChatMessageDbRow[]);
             if (externalAdsRes.data) setExternalAds(externalAdsRes.data as ExternalAd[]);
             if (campaignsRes.data) setCampaigns(campaignsRes.data as Campaign[]);
+            if (paymentMethodsRes.data) setPaymentMethods(paymentMethodsRes.data);
 
             setIsDataLoaded(true);
         } catch (error) {
@@ -375,11 +382,29 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         return data as ChatConversation;
     };
 
+    const addPaymentMethod = async (method: Tables['payment_methods']['Insert']) => {
+        const { data, error } = await supabase.from('payment_methods').insert(method).select().single();
+        if (error) throw error;
+        if (data) setPaymentMethods(prev => [...prev, data]);
+    };
+
+    const updatePaymentMethod = async (methodId: string, updatedData: Tables['payment_methods']['Update']) => {
+        const { data, error } = await supabase.from('payment_methods').update(updatedData).eq('id', methodId).select().single();
+        if (error) throw error;
+        if (data) setPaymentMethods(prev => prev.map(p => p.id === methodId ? data : p));
+    };
+
+    const deletePaymentMethod = async (methodId: string) => {
+        const { error } = await supabase.from('payment_methods').delete().eq('id', methodId);
+        if (error) throw error;
+        setPaymentMethods(prev => prev.filter(p => p.id !== methodId));
+    };
+
     const contextValue: AdminContextType = useMemo(() => ({
         users, ads, externalAds, settings: settings!, categories, provinces, reviews, notifications,
         rfqs, offers, featureFlags, auctions, personalizedOffers, stockWatches, marketBriefs,
         systemHealth, suspiciousActivities, opportunities, dealMemos, smartPayments, negotiationSessions,
-        conversations, messages, campaigns,
+        conversations, messages, campaigns, paymentMethods,
         isDataLoaded,
         connectionStatus,
         retryConnection: fetchData,
@@ -396,6 +421,9 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         addConversation,
         updateConversationLastMessage,
         createNotification,
+        addPaymentMethod,
+        updatePaymentMethod,
+        deletePaymentMethod,
         // Mocked or simplified implementations for other functions
         toggleAdFeature: async (adId: string) => {
             const ad = ads.find(a => a.id === adId);
@@ -757,7 +785,7 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         users, ads, externalAds, settings, categories, provinces, reviews, notifications,
         rfqs, offers, featureFlags, auctions, personalizedOffers, stockWatches, marketBriefs,
         systemHealth, suspiciousActivities, opportunities, dealMemos, smartPayments, negotiationSessions,
-        conversations, messages, campaigns,
+        conversations, messages, campaigns, paymentMethods,
         isDataLoaded, connectionStatus, fetchData
     ]);
     
