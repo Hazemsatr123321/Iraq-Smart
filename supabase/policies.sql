@@ -52,7 +52,7 @@ ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
 -- All users can read all reviews.
 CREATE POLICY "Allow all users to read reviews" ON public.reviews FOR SELECT USING (true);
 -- Logged-in users can insert reviews.
-CREATE POLICY "Allow user to insert a review" ON public.reviews FOR INSERT WITH CHECK (auth.check_role('authenticated'));
+CREATE POLICY "Allow user to insert a review" ON public.reviews FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 -- Users can only update their own reviews.
 CREATE POLICY "Allow user to update their own review" ON public.reviews FOR UPDATE USING (auth.uid() = reviewer_id) WITH CHECK (auth.uid() = reviewer_id);
 -- Users can only delete their own reviews.
