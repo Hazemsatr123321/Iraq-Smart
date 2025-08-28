@@ -42,8 +42,7 @@ export const ProfilePage: React.FC<{
     addToast: (message: string, type?: ToastType) => void,
     onOpenOptimizer: (ad: Ad) => void;
     onOpenFlashDeal: (ad: Ad) => void;
-    onOpenFeatureModal: (ad: Ad) => void;
-}> = ({ onNavigate, userId, addToast, onOpenOptimizer, onOpenFlashDeal, onOpenFeatureModal }) => {
+}> = ({ onNavigate, userId, addToast, onOpenOptimizer, onOpenFlashDeal }) => {
   const { currentUser, favorite_ad_ids } = useUser();
   const { users, ads, getReviewsForSeller, calculateAverageRating, calculatePartnershipScore } = useAdmin();
   
@@ -191,7 +190,7 @@ export const ProfilePage: React.FC<{
           )}
 
           {activeTab === 'myAds' && isWholesaler && (
-             <MyAdsList ads={myAds} onNavigate={onNavigate} addToast={addToast} onOpenOptimizer={onOpenOptimizer} onOpenFlashDeal={onOpenFlashDeal} onOpenFeatureModal={onOpenFeatureModal} />
+             <MyAdsList ads={myAds} onNavigate={onNavigate} addToast={addToast} onOpenOptimizer={onOpenOptimizer} onOpenFlashDeal={onOpenFlashDeal} />
           )}
           
           {activeTab === 'watched' && isMyProfile && (

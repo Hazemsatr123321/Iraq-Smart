@@ -28,6 +28,7 @@ interface UserContextType {
   toggleFavorite: (adId: string) => Promise<void>;
   toggleWatchAd: (adId: string) => Promise<void>;
   changePassword: (newPassword: string) => Promise<void>;
+  featureAd: (adId: string, durationDays: number) => Promise<void>;
   isInitialized: boolean;
   impersonatingAdminId: string | null;
   impersonate: (userToImpersonate: User) => void;
@@ -222,6 +223,18 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setImpersonatingAdminId(null);
     }
   };
+
+  const featureAd = async (adId: string, durationDays: number) => {
+    const { error } = await supabase.rpc('feature_ad', {
+      p_ad_id: adId,
+      p_duration_days: durationDays,
+    });
+
+    if (error) {
+      console.error('Error featuring ad:', error);
+      throw new error;
+    }
+  };
   
   return (
     <UserContext.Provider value={{ 
@@ -235,6 +248,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         toggleFavorite,
         toggleWatchAd,
         changePassword,
+        featureAd,
         isInitialized,
         impersonatingAdminId,
         impersonate,

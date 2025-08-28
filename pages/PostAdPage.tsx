@@ -16,6 +16,7 @@ import { StarIcon } from '../components/icons/StarIcon';
 import { HandHeartIcon } from '../components/icons/HandHeartIcon';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { uploadAdImage, deleteAdImage } from '../services/storageService';
+import { FeatureAdForm } from '../components/common/FeatureAdForm';
 
 const STEPS = ['التفاصيل', 'البيع', 'الصور', 'المراجعة'];
 
@@ -26,8 +27,7 @@ export const PostAdPage: React.FC<{
   adContent: {title: string, description: string},
   addToast: (message: string, type?: ToastType) => void,
   adIdToEdit?: string,
-  onOpenFeatureModal: (ad: Ad) => void;
-}> = ({ onNavigate, onOpenAI, onAdGenerated, adContent, addToast, adIdToEdit, onOpenFeatureModal }) => {
+}> = ({ onNavigate, onOpenAI, onAdGenerated, adContent, addToast, adIdToEdit }) => {
   const { categories, provinces, addAd, getAdById, updateAd, createAuction, settings } = useAdmin();
   const { currentUser } = useUser();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,7 +55,7 @@ export const PostAdPage: React.FC<{
   const [isAuction, setIsAuction] = useState(false);
   const [auctionStartPrice, setAuctionStartPrice] = useState('');
   const [priceTiers, setPriceTiers] = useState<{ quantity: string, price: string }[]>([{ quantity: '', price: '' }]);
-  const [wantsToFeature, setWantsToFeature] = useState(false);
+  const [adJustCreated, setAdJustCreated] = useState<Ad | null>(null);
 
   useEffect(() => {
     if (!currentUser) {
@@ -199,13 +199,8 @@ export const PostAdPage: React.FC<{
             if (isAuction) {
                 await createAuction(newAd.id, parseFloat(auctionStartPrice), 24);
             }
-            if (wantsToFeature) {
-                onOpenFeatureModal(newAd);
-                onNavigate(`/profile/${currentUser.id}?tab=myAds`);
-            } else {
-                addToast('تم إرسال إعلانك للمراجعة بنجاح!');
-                onNavigate(`/profile/${currentUser.id}?tab=myAds`);
-            }
+            addToast('تم إرسال إعلانك للمراجعة بنجاح!');
+            setAdJustCreated(newAd); // Stay on page to show feature options
         }
     } catch (error) {
         console.error("Error submitting ad:", error);
@@ -396,6 +391,38 @@ export const PostAdPage: React.FC<{
       default:
         return null;
     }
+  }
+
+  if (adJustCreated) {
+    return (
+        <div className="bg-brand-primary min-h-screen text-brand-text">
+            <Header variant="page" title="تم استلام إعلانك بنجاح!" />
+            <main className="container mx-auto p-4 pb-24 text-center">
+                <div className="max-w-2xl mx-auto">
+                    <ShieldCheckIcon className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold">شكراً لك!</h2>
+                    <p className="text-brand-text-secondary mb-6">لقد تم استلام إعلانك "{adJustCreated.title}" وسيتم مراجعته من قبل فريقنا قريباً.</p>
+
+                    <FeatureAdForm
+                        ad={adJustCreated}
+                        addToast={addToast}
+                        onSuccess={() => {
+                            addToast('تم تمييز إعلانك بنجاح وسينشر قريباً!');
+                            onNavigate(`/profile/${currentUser?.id}?tab=myAds`);
+                        }}
+                    />
+
+                    <Button
+                        variant="secondary"
+                        onClick={() => onNavigate(`/profile/${currentUser?.id}?tab=myAds`)}
+                        className="mt-4"
+                    >
+                        تخطي والمتابعة إلى إعلاناتي
+                    </Button>
+                </div>
+            </main>
+        </div>
+    )
   }
 
   return (

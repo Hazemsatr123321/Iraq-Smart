@@ -15,6 +15,56 @@ begin
 end;
 $$ language plpgsql;
 
+-- Function to feature a specific ad for a certain number of days
+create or replace function feature_ad(p_ad_id uuid, p_duration_days integer)
+returns void as $$
+declare
+  ad_owner_id uuid;
+  current_user_id uuid := auth.uid();
+  user_rewards integer;
+begin
+  -- Check if user is authenticated
+  if current_user_id is null then
+    raise exception 'Authentication required to feature an ad.';
+  end if;
+
+  -- Get the ad's owner
+  select user_id into ad_owner_id from public.ads where id = p_ad_id;
+
+  -- Check if the ad exists and if the current user owns it
+  if ad_owner_id is null then
+    raise exception 'Ad not found.';
+  end if;
+
+  if ad_owner_id != current_user_id then
+    raise exception 'You can only feature your own ads.';
+  end if;
+
+  -- Check for available rewards first
+  select available_feature_rewards into user_rewards from public.users where id = current_user_id;
+
+  if user_rewards > 0 then
+    -- Use a reward
+    update public.users
+    set available_feature_rewards = available_feature_rewards - 1
+    where id = current_user_id;
+  else
+    -- Here you would typically handle payment verification.
+    -- For now, we assume payment is verified before calling this function.
+    -- The function's main job is to update the ad status.
+    null; -- Placeholder for payment logic which happens client-side for this app
+  end if;
+
+  -- Update the ad to be featured
+  update public.ads
+  set
+    featured = true,
+    featured_until = now() + (p_duration_days || ' days')::interval
+  where id = p_ad_id;
+
+end;
+$$ language plpgsql security definer;
+
 -- Function to get product opportunities (comparing RFQs and Ads)
 create or replace function get_product_opportunities()
 returns table(product_name text, demand bigint, supply bigint) as $$

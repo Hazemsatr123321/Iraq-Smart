@@ -39,7 +39,6 @@ import { OpportunitiesHubPage } from './pages/OpportunitiesHubPage';
 import { SafePayPage } from './pages/SafePayPage';
 import { NegotiationPage } from './pages/NegotiationPage';
 import { PermissionWelcomeModal } from './components/modals/PermissionWelcomeModal';
-import { FeatureAdModal } from './components/modals/FeatureAdModal';
 import { ReferralsPage } from './pages/ReferralsPage';
 import { SocialSupportPage } from './pages/SocialSupportPage';
 import { InstallPWA } from './components/InstallPWA';
@@ -63,7 +62,6 @@ const AppContent: React.FC = () => {
     const [flashDealModalAd, setFlashDealModalAd] = useState<Ad | null>(null);
     const [isStockWatchModalOpen, setStockWatchModalOpen] = useState(false);
     const [showPermissionWelcome, setShowPermissionWelcome] = useState(false);
-    const [featureModalAd, setFeatureModalAd] = useState<Ad | null>(null);
     const [isSecretAdminLoginVisible, setSecretAdminLoginVisible] = useState(false);
     
     const [confirmation, setConfirmation] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void; } | null>(null);
@@ -269,8 +267,6 @@ const AppContent: React.FC = () => {
     const handleCloseFlashDeal = useCallback(() => setFlashDealModalAd(null), []);
     const handleOpenStockWatch = useCallback(() => setStockWatchModalOpen(true), []);
     const handleCloseStockWatch = useCallback(() => setStockWatchModalOpen(false), []);
-    const handleOpenFeatureModal = useCallback((ad: Ad) => setFeatureModalAd(ad), []);
-    const handleCloseFeatureModal = useCallback(() => setFeatureModalAd(null), []);
 
     const handleLogout = async () => {
         try {
@@ -383,7 +379,7 @@ const AppContent: React.FC = () => {
         }
         if (path.startsWith('/profile/')) {
             const userId = path.substring(9);
-            return <ProfilePage userId={userId} onNavigate={handleNavigation} addToast={addToast} onOpenOptimizer={handleOpenOptimizer} onOpenFlashDeal={handleOpenFlashDeal} onOpenFeatureModal={handleOpenFeatureModal}/>;
+            return <ProfilePage userId={userId} onNavigate={handleNavigation} addToast={addToast} onOpenOptimizer={handleOpenOptimizer} onOpenFlashDeal={handleOpenFlashDeal} />;
         }
          if (path.startsWith('/chat/')) {
             const conversationId = path.substring(6);
@@ -391,7 +387,7 @@ const AppContent: React.FC = () => {
         }
         if (path.startsWith('/post/edit/')) {
             const adIdToEdit = path.substring(11);
-            return <PostAdPage onNavigate={handleNavigation} onOpenAI={mode => { setAIMode(mode); setIsAIOpen(true); }} onAdGenerated={setGeneratedAdContent} adContent={generatedAdContent} addToast={addToast} adIdToEdit={adIdToEdit} onOpenFeatureModal={handleOpenFeatureModal} />;
+            return <PostAdPage onNavigate={handleNavigation} onOpenAI={mode => { setAIMode(mode); setIsAIOpen(true); }} onAdGenerated={setGeneratedAdContent} adContent={generatedAdContent} addToast={addToast} adIdToEdit={adIdToEdit} />;
         }
         if (path.startsWith('/auction/')) {
             const auctionId = path.substring(9);
@@ -408,7 +404,7 @@ const AppContent: React.FC = () => {
 
         switch (path) {
             case '/': return <HomePage onNavigate={handleNavigation} onAdminAccess={handleAdminAccess} />;
-            case '/post': return <PostAdPage onNavigate={handleNavigation} onOpenAI={mode => { setAIMode(mode); setIsAIOpen(true); }} onAdGenerated={setGeneratedAdContent} adContent={generatedAdContent} addToast={addToast} onOpenFeatureModal={handleOpenFeatureModal} />;
+            case '/post': return <PostAdPage onNavigate={handleNavigation} onOpenAI={mode => { setAIMode(mode); setIsAIOpen(true); }} onAdGenerated={setGeneratedAdContent} adContent={generatedAdContent} addToast={addToast} />;
             case '/chat': return <ChatListPage onNavigate={handleNavigation} />;
             case '/notifications': return <NotificationsPage onNavigate={handleNavigation} />;
             case '/ads': return <AdsExplorerPage onNavigate={handleNavigation} onOpenStockWatch={handleOpenStockWatch} />;
@@ -451,7 +447,6 @@ const AppContent: React.FC = () => {
             <CreateFlashDealModal ad={flashDealModalAd} onClose={handleCloseFlashDeal} onSubmit={handleCreateFlashDeal} />
             <CreateStockWatchModal isOpen={isStockWatchModalOpen} onClose={handleCloseStockWatch} onSubmit={handleCreateStockWatch} />
             <PermissionWelcomeModal isOpen={showPermissionWelcome} onClose={() => { setShowPermissionWelcome(false); localStorage.setItem('permission_welcome_seen', 'true'); }} />
-            <FeatureAdModal ad={featureModalAd} onClose={handleCloseFeatureModal} addToast={addToast} />
             <SecretAdminLogin
                 isOpen={isSecretAdminLoginVisible}
                 onClose={() => setSecretAdminLoginVisible(false)}
