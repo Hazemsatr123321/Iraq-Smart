@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Header } from '../components/Header';
 import { useUser } from '../contexts/UserContext';
+import { useAdmin } from '../contexts/AdminContext';
 import { Button } from '../components/common/Button';
 import { UsersIcon } from '../components/icons/UsersIcon';
 import { AwardIcon } from '../components/icons/AwardIcon';
@@ -91,7 +92,7 @@ export const ReferralsPage: React.FC<{
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-gray-700">
                         <div className="bg-brand-primary/50 p-6 rounded-lg text-center">
                             <UsersIcon className="w-10 h-10 text-brand-accent mx-auto mb-3" />
-                            <p className="text-4xl font-bold text-white">{currentUser.referrals.length}</p>
+                            <p className="text-4xl font-bold text-white">{referralCount}</p>
                             <p className="text-brand-text-secondary">مستخدم سجل عبر رابطك</p>
                         </div>
                         <div className="bg-brand-primary/50 p-6 rounded-lg text-center">

@@ -91,7 +91,6 @@ export interface User {
   // Referral System
   referral_code: string;
   referred_by?: string;
-  referrals: string[];
   available_feature_rewards: number;
   pending_referral_reward?: boolean;
   web_authn_credential_id?: string;

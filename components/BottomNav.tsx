@@ -7,6 +7,7 @@ import { GridIcon } from './icons/GridIcon';
 import { useChat } from '../contexts/ChatContext';
 import { useUser } from '../contexts/UserContext';
 import { HomeIcon } from './icons/HomeIcon';
+import { LayoutDashboardIcon } from './icons/LayoutDashboardIcon';
 
 
 interface BottomNavProps {
@@ -64,6 +65,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({ onNavigate, activePath }) 
   };
 
 
+  const isAdmin = currentUser && ['admin', 'moderator', 'support'].includes(currentUser.role);
+
   return (
     <footer 
       style={{ paddingBottom: 'var(--safe-area-inset-bottom)' }}
@@ -83,13 +86,27 @@ export const BottomNav: React.FC<BottomNavProps> = ({ onNavigate, activePath }) 
             onClick={() => onNavigate('/ads')}
         />
 
-        <button 
-            onClick={handlePostAdClick} 
-            className="bg-brand-accent text-brand-primary rounded-full w-14 h-14 flex items-center justify-center -mt-8 shadow-lg shadow-brand-accent/30 transform transition-transform active:scale-90 border-4 border-brand-primary" 
-            aria-label="إضافة إعلان"
-        >
-            <PlusIcon className="w-8 h-8"/>
-        </button>
+        { !isAdmin && (
+            <button
+                onClick={handlePostAdClick}
+                className="bg-brand-accent text-brand-primary rounded-full w-14 h-14 flex items-center justify-center -mt-8 shadow-lg shadow-brand-accent/30 transform transition-transform active:scale-90 border-4 border-brand-primary"
+                aria-label="إضافة إعلان"
+            >
+                <PlusIcon className="w-8 h-8"/>
+            </button>
+        )}
+
+        { isAdmin && (
+            <div className="-mt-8">
+                 <NavItem
+                    icon={<LayoutDashboardIcon className="w-8 h-8 p-1 bg-brand-accent text-brand-primary rounded-full" />}
+                    label="المدير"
+                    isActive={activePath.startsWith('/admin')}
+                    onClick={() => onNavigate('/admin')}
+                />
+            </div>
+        )}
+
 
         <NavItem 
             icon={
