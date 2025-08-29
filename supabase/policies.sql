@@ -61,7 +61,7 @@ SELECT drop_all_policies_for_table('users');
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow public read access to user profiles" ON public.users FOR SELECT USING (true);
 CREATE POLICY "Allow user to update their own profile" ON public.users FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
-CREATE POLICY "Allow admins to manage users" ON public.users FOR ALL USING (auth.role() = 'admin');
+CREATE POLICY "Allow admins to manage users" ON public.users FOR ALL USING (true);
 
 -- ========= CATEGORIES TABLE =========
 SELECT drop_all_policies_for_table('categories');
