@@ -60,8 +60,7 @@ const Countdown: React.FC<{ endTime: string, onEnd: () => void }> = ({ endTime, 
 
 export const HomePage: React.FC<{ 
     onNavigate: (path: string) => void,
-    onAdminAccess: () => void 
-}> = ({ onNavigate, onAdminAccess }) => {
+}> = ({ onNavigate }) => {
   const { ads, users, settings, personalizedOffers, auctions, externalAds, campaigns } = useAdmin();
   const { currentUser } = useUser();
   const [renderTrigger, setRenderTrigger] = useState(0);
@@ -97,7 +96,7 @@ export const HomePage: React.FC<{
     <div className="min-h-screen text-brand-text luxury-homepage-bg">
        <div className="relative pt-24 md:pt-32">
          
-         <Header onNavigate={onNavigate} onAdminAccess={onAdminAccess} />
+         <Header onNavigate={onNavigate} />
 
           <main className="container mx-auto p-4 pb-24">
             <div className="text-center pb-16 md:pb-24 px-4">

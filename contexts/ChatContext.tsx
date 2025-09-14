@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode, useCallback, useEffect } from 'react';
 import type { ChatConversation, ChatMessage, Ad, NegotiationSession, DealMemo, NegotiationMessage, TextChatMessage, MessageStatus, ChatMessageDbRow } from '../types';
 import { useUser } from './UserContext';
+import { supabase } from '../services/supabaseClient';
 import { useAdmin } from './AdminContext';
 import { generateDealMemoFromChat } from '../services/geminiService';
 
@@ -36,19 +37,58 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   } = useAdmin();
 
   const [userConversations, setUserConversations] = useState<ChatConversation[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessageDbRow[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  
+
   useEffect(() => {
     if (!currentUser) {
-      setUserConversations([]);
-      setUnreadCount(0);
-      return;
+        setUserConversations([]);
+        setChatMessages([]);
+        return;
     }
 
-    const myConversations = conversations.filter(c => c.participant_ids.includes(currentUser.id));
-    setUserConversations(myConversations);
+    const fetchConversations = async () => {
+        const { data, error } = await supabase
+            .from('chat_conversations')
+            .select('*')
+            .contains('participant_ids', [currentUser.id]);
 
-    const unread = myConversations.reduce((count, conv) => {
+        if (error) console.error('Error fetching conversations', error);
+        else setUserConversations(data || []);
+    };
+
+    fetchConversations();
+
+    const conversationSubscription = supabase
+        .channel('public:chat_conversations')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_conversations' }, payload => {
+            fetchConversations();
+        })
+        .subscribe();
+
+    const messageSubscription = supabase
+        .channel('public:chat_messages')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, payload => {
+            const newMessage = payload.new as ChatMessageDbRow;
+            const relevantConversation = userConversations.find(c => c.id === newMessage.conversation_id);
+            if (relevantConversation) {
+                setChatMessages(prev => [...prev, newMessage]);
+            }
+        })
+        .subscribe();
+
+    return () => {
+        supabase.removeChannel(conversationSubscription);
+        supabase.removeChannel(messageSubscription);
+    };
+  }, [currentUser]);
+
+  useEffect(() => {
+      if (!currentUser) {
+          setUnreadCount(0);
+          return;
+      }
+      const unread = userConversations.reduce((count, conv) => {
         const lastMessage = conv.last_message as ChatMessage;
         if (lastMessage && lastMessage.sender_id !== currentUser.id && lastMessage.status !== 'read') {
             return count + 1;
@@ -56,14 +96,27 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return count;
     }, 0);
     setUnreadCount(unread);
-
-  }, [currentUser, conversations, messages]);
+  }, [userConversations, currentUser]);
 
   const getMessagesForConversation = useCallback((conversationId: string): ChatMessage[] => {
-    // Cast the DB row type to the application's union type.
-    // This is safe as long as the application logic correctly handles the 'type' property.
-    return messages.filter(m => m.conversation_id === conversationId).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) as ChatMessage[];
-  }, [messages]);
+    return chatMessages.filter(m => m.conversation_id === conversationId).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) as ChatMessage[];
+  }, [chatMessages]);
+
+  useEffect(() => {
+    const fetchMessages = async () => {
+        if (userConversations.length > 0) {
+            const conversationIds = userConversations.map(c => c.id);
+            const { data, error } = await supabase
+                .from('chat_messages')
+                .select('*')
+                .in('conversation_id', conversationIds);
+
+            if (error) console.error('Error fetching messages', error);
+            else setChatMessages(data || []);
+        }
+    };
+    fetchMessages();
+  }, [userConversations]);
 
   const sendMessage = useCallback(async (conversationId: string, text: string, type: 'text' | 'ad_link' | 'deal_memo' = 'text', details?: any) => {
     if (!currentUser) return;
@@ -86,7 +139,17 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
     }
     
-    const newMessageDbRow = await addMessage(messagePayload);
+    const { data: newMessageDbRow, error } = await supabase
+        .from('chat_messages')
+        .insert(messagePayload)
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Error sending message', error);
+        return;
+    }
+
     // Cast back to the application's union type for use in other parts of the app like 'last_message'.
     const newMessage = newMessageDbRow as ChatMessage;
     await updateConversationLastMessage(conversationId, newMessage);
@@ -95,16 +158,15 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const startConversation = useCallback(async (otherUserId: string, ad?: Ad): Promise<ChatConversation | null> => {
     if (!currentUser) return null;
-    
+
     const sortedIds = [currentUser.id, otherUserId].sort();
-    
-    const existing = conversations.find(c => 
-        c.participant_ids.length === 2 && 
+
+    const existing = userConversations.find(c =>
+        c.participant_ids.length === 2 &&
         c.participant_ids.every(id => sortedIds.includes(id))
     );
 
     if (existing) {
-        // If a conversation exists, ensure its last message is up-to-date with any new ad context
         if (ad) {
             await sendMessage(existing.id, '', 'ad_link', { ad_id: ad.id, title: ad.title, price: ad.price, image: ad.images[0] });
             await sendMessage(existing.id, `مرحباً، أراسلك بخصوص إعلان "${ad.title}". هل المنتج متوفر؟`);
@@ -112,24 +174,27 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return existing;
     }
 
-    const newConversationData: Omit<ChatConversation, 'id'> = {
-        participant_ids: sortedIds,
-        last_message: null,
-    };
-    const newConversation = await addConversation(newConversationData);
+    const { data: newConversation, error: createError } = await supabase
+        .from('chat_conversations')
+        .insert({ participant_ids: sortedIds, last_message: null })
+        .select()
+        .single();
+
+    if (createError) {
+        console.error('Error creating conversation', createError);
+        return null;
+    }
 
     const firstMessageText = ad ? `مرحباً، أراسلك بخصوص إعلان "${ad.title}". هل المنتج متوفر؟` : `مرحباً.`;
     if (ad) await sendMessage(newConversation.id, '', 'ad_link', { ad_id: ad.id, title: ad.title, price: ad.price, image: ad.images[0] });
     await sendMessage(newConversation.id, firstMessageText);
 
-    // Return the latest version from state after updates
-    return conversations.find(c => c.id === newConversation.id) || newConversation;
-
-  }, [currentUser, sendMessage, conversations, addConversation]);
+    return newConversation;
+}, [currentUser, sendMessage, userConversations]);
 
   const markConversationAsRead = useCallback(async (conversationId: string) => {
     if (!currentUser) return;
-    const conversation = conversations.find(c => c.id === conversationId);
+    const conversation = userConversations.find(c => c.id === conversationId);
     if (!conversation || !conversation.last_message) return;
     
     const lastMessage = conversation.last_message as ChatMessage;
@@ -137,7 +202,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     await updateConversationLastMessage(conversationId, { ...lastMessage, status: 'read' });
 
-  }, [currentUser, conversations, updateConversationLastMessage]);
+  }, [currentUser, userConversations, updateConversationLastMessage]);
   
   const generateAndSendDealMemo = useCallback(async (conversationId: string, convMessages: ChatMessage[]) => {
     if (!currentUser) throw new Error("يجب تسجيل الدخول أولاً.");

@@ -2,7 +2,7 @@
 
 import React, { createContext, useState, useContext, ReactNode, useCallback, useMemo, useEffect } from 'react';
 import type { User, Ad, ExternalAd, AppSettings, UserRole, Category, Province, Review, Notification, RequestForQuotation, Offer, FeatureFlag, Auction, Bid, PersonalizedOffer, StockWatch, MarketBrief, SystemHealth, SuspiciousActivity, Opportunity, DealMemo, SmartPayment, NegotiationSession, OrderEvent, NegotiationMessage, ChatConversation, ChatMessage, FlashDeal, Campaign, ChatMessageDbRow } from '../types';
-import * as mockData from '../data/mockData';
+import { supabase } from '../services/supabaseClient';
 import { ConnectionStatus } from '../components/common/ConnectionStatusIndicator';
 
 interface AppState {
@@ -121,9 +121,59 @@ interface AdminContextType extends Omit<AppState, 'settings'> {
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
 export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [state, setState] = useState<AppState>(mockData.initialState);
-    const [isDataLoaded, setIsDataLoaded] = useState(true);
+    const [state, setState] = useState<AppState>({
+        users: [], ads: [], externalAds: [], settings: null, categories: [], provinces: [],
+        reviews: [], notifications: [], rfqs: [], offers: [], featureFlags: [], auctions: [],
+        personalizedOffers: [], stockWatches: [], marketBriefs: [],
+        systemHealth: { api_status: 'operational', database_status: 'operational', ai_service_status: 'operational' },
+        suspiciousActivities: [], opportunities: [], dealMemos: [], smartPayments: [],
+        negotiationSessions: [], conversations: [], messages: [], campaigns: []
+    });
+    const [isDataLoaded, setIsDataLoaded] = useState(false);
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('online');
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setConnectionStatus('online');
+                const [
+                    { data: users, error: usersError },
+                    { data: ads, error: adsError },
+                    { data: categories, error: categoriesError },
+                    { data: provinces, error: provincesError },
+                    { data: settings, error: settingsError },
+                ] = await Promise.all([
+                    supabase.from('users').select('*'),
+                    supabase.from('ads').select('*'),
+                    supabase.from('categories').select('*'),
+                    supabase.from('provinces').select('*'),
+                    supabase.from('app_settings').select('*').single(),
+                ]);
+
+                if (usersError) throw usersError;
+                if (adsError) throw adsError;
+                if (categoriesError) throw categoriesError;
+                if (provincesError) throw provincesError;
+                if (settingsError) throw settingsError;
+
+                setState(prevState => ({
+                    ...prevState,
+                    users: users || [],
+                    ads: ads || [],
+                    categories: categories || [],
+                    provinces: provinces || [],
+                    settings: settings || null,
+                }));
+            } catch (error) {
+                console.error("Error loading initial data:", error);
+                setConnectionStatus('offline');
+            } finally {
+                setIsDataLoaded(true);
+            }
+        };
+
+        fetchData();
+    }, []);
 
     const createNotification = useCallback(async (notification: Omit<Notification, 'id' | 'timestamp' | 'is_read'>) => {
         const newNotification: Notification = {
@@ -136,27 +186,35 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }, []);
 
     const addAd = async (newAdData: Omit<Ad, 'id' | 'user_id' | 'featured' | 'status' | 'views' | 'saves'>, userId: string): Promise<Ad> => {
-        const newAd: Ad = {
-            ...newAdData,
-            id: `ad-${Date.now()}`,
-            user_id: userId,
-            status: 'pending',
-            featured: false,
-            views: 0,
-            saves: 0,
-        };
-        setState(prev => ({ ...prev, ads: [...prev.ads, newAd] }));
-        return newAd;
+        const { data, error } = await supabase
+            .from('ads')
+            .insert([{ ...newAdData, user_id: userId }])
+            .select()
+            .single();
+
+        if (error) throw error;
+        setState(prev => ({ ...prev, ads: [...prev.ads, data] }));
+        return data;
     };
     
     const updateAd = async (adId: string, updatedData: Partial<Omit<Ad, 'id'>>) => {
+        const { data, error } = await supabase
+            .from('ads')
+            .update({ ...updatedData, status: 'pending' })
+            .eq('id', adId)
+            .select()
+            .single();
+
+        if (error) throw error;
         setState(prev => ({
             ...prev,
-            ads: prev.ads.map(ad => ad.id === adId ? { ...ad, ...updatedData, status: 'pending' } : ad)
+            ads: prev.ads.map(ad => (ad.id === adId ? data : ad))
         }));
     };
     
     const deleteAd = async (adId: string) => {
+        const { error } = await supabase.from('ads').delete().eq('id', adId);
+        if (error) throw error;
         setState(prev => ({ ...prev, ads: prev.ads.filter(ad => ad.id !== adId) }));
     };
 
@@ -175,24 +233,27 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
     
     const updateAdStatus = async (adId: string, status: 'approved' | 'rejected', rejectionReason?: string) => {
-        let adToNotify: Ad | undefined;
-        setState(prev => {
-            const newAds = prev.ads.map(ad => {
-                if (ad.id === adId) {
-                    adToNotify = { ...ad, status, rejection_reason: rejectionReason };
-                    return adToNotify;
-                }
-                return ad;
-            });
-            return { ...prev, ads: newAds };
-        });
-        if (adToNotify) {
+        const { data: updatedAd, error } = await supabase
+            .from('ads')
+            .update({ status, rejection_reason: rejectionReason })
+            .eq('id', adId)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        setState(prev => ({
+            ...prev,
+            ads: prev.ads.map(ad => (ad.id === adId ? updatedAd : ad))
+        }));
+
+        if (updatedAd) {
             await createNotification({
-                user_id: adToNotify.user_id,
+                user_id: updatedAd.user_id,
                 type: status === 'approved' ? 'ad_approved' : 'ad_rejected',
-                text: status === 'approved' ? `تمت الموافقة على إعلانك: "${adToNotify.title}"` : `تم رفض إعلانك: "${adToNotify.title}"`,
-                link: `/ad/${adToNotify.id}`,
-                related_id: adToNotify.id,
+                text: status === 'approved' ? `تمت الموافقة على إعلانك: "${updatedAd.title}"` : `تم رفض إعلانك: "${updatedAd.title}"`,
+                link: `/ad/${updatedAd.id}`,
+                related_id: updatedAd.id,
             });
         }
     };
@@ -207,9 +268,17 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
     
     const updateUser = async (userId: string, updatedData: Partial<Omit<User, 'id'>>) => {
+        const { data, error } = await supabase
+            .from('users')
+            .update(updatedData)
+            .eq('id', userId)
+            .select()
+            .single();
+
+        if (error) throw error;
         setState(prev => ({
             ...prev,
-            users: prev.users.map(u => u.id === userId ? {...u, ...updatedData} : u)
+            users: prev.users.map(u => (u.id === userId ? data : u))
         }));
     };
 
@@ -224,10 +293,12 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
 
     const updateConversationLastMessage = async (conversationId: string, message: ChatMessage) => {
-        setState(prev => ({
-            ...prev,
-            conversations: prev.conversations.map(c => c.id === conversationId ? {...c, last_message: message} : c)
-        }));
+        const { error } = await supabase
+            .from('chat_conversations')
+            .update({ last_message: message })
+            .eq('id', conversationId);
+
+        if (error) console.error('Error updating last message', error);
     };
 
     const addConversation = async (conversationData: Omit<ChatConversation, 'id'>): Promise<ChatConversation> => {
@@ -290,12 +361,65 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         createFlashDeal: async () => {}, createPersonalizedOffer: async () => {}, endFlashDeal: async () => {},
         createStockWatch: async () => {}, getStockWatchesForUser: (userId: string) => state.stockWatches.filter(sw => sw.user_id === userId), deleteStockWatch: async () => {}, featureAdForFree: async () => {},
         updateUserRole: async (userId, role) => { updateUser(userId, { role }) }, toggleUserBan: async (userId) => { const u = state.users.find(u=>u.id===userId); if(u) updateUser(userId, { banned: !u.banned }) }, toggleUserVerification: async (userId) => { const u = state.users.find(u=>u.id===userId); if(u) updateUser(userId, { is_verified: !u.is_verified }) },
-        deleteUser: async () => {}, 
-        updateSettings: async (newSettings) => { setState(prev => ({...prev, settings: {...prev.settings!, ...newSettings}}))},
-        addExternalAd: async () => {}, updateExternalAd: async () => {}, addCategory: async () => {},
-        deleteCategory: async () => {}, addSubcategory: async () => {}, deleteSubcategory: async () => {},
-        addProvince: async () => {}, deleteProvince: async () => {},
-        getReviewsForSeller: (sellerId) => state.reviews.filter(r => r.seller_id === sellerId), deleteReview: async () => {},
+        deleteUser: async (userId: string) => {
+            const { error } = await supabase.from('users').delete().eq('id', userId);
+            if (error) throw error;
+            setState(prev => ({ ...prev, users: prev.users.filter(u => u.id !== userId) }));
+        },
+        updateSettings: async (newSettings) => {
+            const { data, error } = await supabase
+                .from('app_settings')
+                .update(newSettings)
+                .eq('id', 1)
+                .select()
+                .single();
+            if (error) throw error;
+            setState(prev => ({ ...prev, settings: data }));
+        },
+        addExternalAd: async () => {},
+        updateExternalAd: async () => {},
+        addCategory: async (name: string) => {
+            const { data, error } = await supabase.from('categories').insert({ name }).select().single();
+            if (error) throw error;
+            setState(prev => ({ ...prev, categories: [...prev.categories, data] }));
+        },
+        deleteCategory: async (id: string) => {
+            const { error } = await supabase.from('categories').delete().eq('id', id);
+            if (error) throw error;
+            setState(prev => ({ ...prev, categories: prev.categories.filter(c => c.id !== id) }));
+        },
+        addSubcategory: async (categoryId: string, name: string) => {
+            const category = state.categories.find(c => c.id === categoryId);
+            if (!category) return;
+            const newSubcategories = [...(category.subcategories || []), name];
+            const { data, error } = await supabase.from('categories').update({ subcategories: newSubcategories }).eq('id', categoryId).select().single();
+            if (error) throw error;
+            setState(prev => ({ ...prev, categories: prev.categories.map(c => c.id === categoryId ? data : c) }));
+        },
+        deleteSubcategory: async (categoryId: string, name: string) => {
+            const category = state.categories.find(c => c.id === categoryId);
+            if (!category) return;
+            const newSubcategories = (category.subcategories || []).filter(s => s !== name);
+            const { data, error } = await supabase.from('categories').update({ subcategories: newSubcategories }).eq('id', categoryId).select().single();
+            if (error) throw error;
+            setState(prev => ({ ...prev, categories: prev.categories.map(c => c.id === categoryId ? data : c) }));
+        },
+        addProvince: async (name: string) => {
+            const { data, error } = await supabase.from('provinces').insert({ name }).select().single();
+            if (error) throw error;
+            setState(prev => ({ ...prev, provinces: [...prev.provinces, data] }));
+        },
+        deleteProvince: async (id: string) => {
+            const { error } = await supabase.from('provinces').delete().eq('id', id);
+            if (error) throw error;
+            setState(prev => ({ ...prev, provinces: prev.provinces.filter(p => p.id !== id) }));
+        },
+        getReviewsForSeller: (sellerId) => state.reviews.filter(r => r.seller_id === sellerId),
+        deleteReview: async (reviewId: string) => {
+            const { error } = await supabase.from('reviews').delete().eq('id', reviewId);
+            if (error) throw error;
+            setState(prev => ({ ...prev, reviews: prev.reviews.filter(r => r.id !== reviewId) }));
+        },
         calculateAverageRating: (sellerId: string) => {
             const relevantReviews = state.reviews.filter(r => r.seller_id === sellerId);
             if (relevantReviews.length === 0) return { average: 0, count: 0 };

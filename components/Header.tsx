@@ -28,9 +28,6 @@ export const Header: React.FC<HeaderProps> = ({
   const [query, setQuery] = React.useState('');
   const { notifications } = useAdmin();
   const { currentUser } = useUser();
-  const [adminClickCount, setAdminClickCount] = useState(0);
-  const adminClickTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const unreadCount = useMemo(() => {
     if (!currentUser) return 0;
     return notifications.filter(n => n.user_id === currentUser.id && !n.is_read).length;
@@ -40,26 +37,6 @@ export const Header: React.FC<HeaderProps> = ({
     e.preventDefault();
     if (onSearch) {
       onSearch(query);
-    }
-  };
-
-  const handleAdminAccessTrigger = () => {
-    if (!onAdminAccess) return;
-
-    if (adminClickTimeout.current) {
-        clearTimeout(adminClickTimeout.current);
-    }
-
-    const newCount = adminClickCount + 1;
-    setAdminClickCount(newCount);
-
-    if (newCount >= 5) {
-        onAdminAccess();
-        setAdminClickCount(0);
-    } else {
-        adminClickTimeout.current = setTimeout(() => {
-            setAdminClickCount(0);
-        }, 1500); // Reset after 1.5 seconds of inactivity
     }
   };
   
@@ -108,9 +85,7 @@ export const Header: React.FC<HeaderProps> = ({
     >
       <div className="container mx-auto flex justify-between items-center gap-4">
         <div 
-          className="flex items-center gap-2 cursor-pointer"
-          onClick={handleAdminAccessTrigger}
-          title="Admin Access"
+          className="flex items-center gap-2"
         >
             <SparklesIcon className="h-8 w-8 text-brand-accent"/>
             <h1 className="text-xl md:text-2xl font-extrabold text-brand-text whitespace-nowrap">سوق العراق الذكي</h1>

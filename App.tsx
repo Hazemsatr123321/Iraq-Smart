@@ -46,7 +46,6 @@ import { InstallPWA } from './components/InstallPWA';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ConfirmationModal } from './components/modals/ConfirmationModal';
 import { PromptModal } from './components/modals/PromptModal';
-import { SecretAdminLogin } from './components/modals/SecretAdminLogin';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { DraggableAIAssistantButton } from './components/DraggableAIAssistantButton';
 
@@ -64,8 +63,6 @@ const AppContent: React.FC = () => {
     const [isStockWatchModalOpen, setStockWatchModalOpen] = useState(false);
     const [showPermissionWelcome, setShowPermissionWelcome] = useState(false);
     const [featureModalAd, setFeatureModalAd] = useState<Ad | null>(null);
-    const [isSecretAdminLoginVisible, setSecretAdminLoginVisible] = useState(false);
-    
     const [confirmation, setConfirmation] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void; } | null>(null);
     const [prompt, setPrompt] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: (value: string) => void; } | null>(null);
 
@@ -167,19 +164,6 @@ const AppContent: React.FC = () => {
         }
     }, []);
     
-    const handleAdminAccess = useCallback(() => {
-        setSecretAdminLoginVisible(true);
-    }, []);
-
-    const handleSecretLoginSuccess = useCallback((user: User) => {
-        setSecretAdminLoginVisible(false);
-        if (user.role === 'admin' || user.role === 'moderator' || user.role === 'support') {
-            handleNavigation('/admin');
-            addToast(`تم تسجيل الدخول بنجاح كـ ${user.name}.`, 'success');
-        } else {
-            addToast('هذا الحساب لا يملك صلاحيات المدير.', 'error');
-        }
-    }, [handleNavigation, addToast]);
 
     useEffect(() => {
         const handleHashChange = () => {
@@ -363,6 +347,15 @@ const AppContent: React.FC = () => {
         setShowInstallBanner(false);
     };
 
+    const handleLoginSuccess = useCallback((user: User) => {
+        const adminRoles: UserRole[] = ['admin', 'moderator', 'support'];
+        if (adminRoles.includes(user.role)) {
+            handleNavigation('/admin');
+        } else {
+            handleNavigation(postLoginPath);
+        }
+    }, [handleNavigation, postLoginPath]);
+
     const renderPage = () => {
         const path = location.substring(1).split('?')[0] || '/';
         const urlParams = new URLSearchParams(location.split('?')[1]);
@@ -402,12 +395,13 @@ const AppContent: React.FC = () => {
         }
 
         switch (path) {
-            case '/': return <HomePage onNavigate={handleNavigation} onAdminAccess={handleAdminAccess} />;
+            case '/': return <HomePage onNavigate={handleNavigation} />;
             case '/post': return <PostAdPage onNavigate={handleNavigation} onOpenAI={mode => { setAIMode(mode); setIsAIOpen(true); }} onAdGenerated={setGeneratedAdContent} adContent={generatedAdContent} addToast={addToast} onOpenFeatureModal={handleOpenFeatureModal} />;
             case '/chat': return <ChatListPage onNavigate={handleNavigation} />;
             case '/notifications': return <NotificationsPage onNavigate={handleNavigation} />;
             case '/ads': return <AdsExplorerPage onNavigate={handleNavigation} onOpenStockWatch={handleOpenStockWatch} />;
-            case '/auth': return <AuthPage onLoginSuccess={() => handleNavigation(postLoginPath)} onRegisterSuccess={() => handleNavigation(postLoginPath)} onNavigate={handleNavigation} referrerId={refCode}/>;
+            case '/auth':
+                return <AuthPage onLoginSuccess={handleLoginSuccess} onRegisterSuccess={() => handleNavigation(postLoginPath)} onNavigate={handleNavigation} referrerId={refCode}/>;
             case '/reset-password': return <ResetPasswordPage onNavigate={handleNavigation} addToast={addToast} />;
             case '/account': return <AccountPage onNavigate={handleNavigation} onLogout={handleLogout} />;
             case '/admin': return <AdminPage onNavigate={handleNavigation} onLogout={handleLogout} />;
@@ -447,13 +441,6 @@ const AppContent: React.FC = () => {
             <CreateStockWatchModal isOpen={isStockWatchModalOpen} onClose={handleCloseStockWatch} onSubmit={handleCreateStockWatch} />
             <PermissionWelcomeModal isOpen={showPermissionWelcome} onClose={() => { setShowPermissionWelcome(false); localStorage.setItem('permission_welcome_seen', 'true'); }} />
             <FeatureAdModal ad={featureModalAd} onClose={handleCloseFeatureModal} addToast={addToast} />
-            <SecretAdminLogin
-                isOpen={isSecretAdminLoginVisible}
-                onClose={() => setSecretAdminLoginVisible(false)}
-                onSuccess={handleSecretLoginSuccess}
-                addToast={addToast}
-            />
-
             <ConfirmationModal
                 isOpen={!!confirmation?.isOpen}
                 onClose={() => setConfirmation(null)}

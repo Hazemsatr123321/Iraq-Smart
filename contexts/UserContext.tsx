@@ -1,6 +1,7 @@
 
 import React, { createContext, useState, useContext, ReactNode, useCallback, useEffect } from 'react';
 import type { User, UserRole } from '../types';
+import { supabase } from '../services/supabaseClient';
 import { useAdmin } from './AdminContext';
 
 interface RegisterData {
@@ -37,31 +38,64 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-// Hardcoded passwords for mock users for demonstration
-const MOCK_PASSWORDS: Record<string, string> = {
-    'admin@example.com': 'hazemsatr1',
-};
-
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [impersonatingAdminId, setImpersonatingAdminId] = useState<string | null>(null);
-  const [isInitialized, setIsInitialized] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [authEvent, setAuthEvent] = useState<any | null>(null);
   const { users, addUser, updateUser } = useAdmin();
 
+  useEffect(() => {
+    const getSession = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+            const { data: userProfile } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
+            setCurrentUser(userProfile);
+        }
+        setIsInitialized(true);
+    };
+
+    getSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (session?.user) {
+            const { data: userProfile } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
+            setCurrentUser(userProfile);
+        } else {
+            setCurrentUser(null);
+        }
+        setAuthEvent(event);
+    });
+
+    return () => {
+        authListener.subscription.unsubscribe();
+    };
+  }, []);
+
   const login = async (email: string, password: string): Promise<User> => {
-    console.log(`Attempting login for ${email}`);
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    if (authError) throw authError;
+    if (!authData.user) throw new Error("Login failed, no user returned.");
     
-    // Simulate password check
-    if (user && MOCK_PASSWORDS[user.email] === password) {
-        console.log("Login successful", user);
-        setCurrentUser(user);
-        return user;
-    } else {
-        console.log("Login failed");
-        throw new Error("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
-    }
+    const { data: userProfile, error: profileError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', authData.user.id)
+        .single();
+
+    if (profileError) throw profileError;
+    if (!userProfile) throw new Error("User profile not found.");
+
+    setCurrentUser(userProfile);
+    return userProfile;
   };
   
   const webAuthnLogin = async (): Promise<User> => {
@@ -69,29 +103,35 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = async () => {
+    await supabase.auth.signOut();
     setCurrentUser(null);
     setImpersonatingAdminId(null);
   };
   
   const resetPassword = async (email: string) => {
-    console.log(`Password reset requested for ${email}. In a real app, an email would be sent.`);
-    // In mock mode, we just show a success message.
-    return Promise.resolve();
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '#/reset-password',
+    });
+    if (error) throw error;
   };
   
   const changePassword = async (newPassword: string) => {
     if (!currentUser) throw new Error("No user logged in.");
-    console.log(`Password for ${currentUser.email} changed to ${newPassword}.`);
-    MOCK_PASSWORDS[currentUser.email] = newPassword; // Update mock password
-    return Promise.resolve();
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
   };
 
   const register = async (userData: RegisterData, referrerCode?: string): Promise<User> => {
-    if (users.some(u => u.email.toLowerCase() === userData.email.toLowerCase())) {
-        throw new Error("هذا البريد الإلكتروني مسجل بالفعل.");
-    }
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: userData.email,
+        password: userData.password!,
+    });
 
-    const newUserPayload: Omit<User, 'id'> = {
+    if (authError) throw authError;
+    if (!authData.user) throw new Error("Registration failed, no user returned.");
+
+    const newUserPayload = {
+        id: authData.user.id,
         email: userData.email,
         name: userData.name,
         role: userData.role,
@@ -105,11 +145,16 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         referral_code: `${userData.name.toUpperCase().slice(0,4)}${Math.floor(Math.random() * 1000)}`,
         referrals: [],
         available_feature_rewards: 0,
-    }
+    };
 
-    const newUser = await addUser(newUserPayload);
-    // @ts-ignore
-    MOCK_PASSWORDS[newUser.email] = userData.password; // Add password for new user
+    const { data: newUser, error: profileError } = await supabase
+        .from('users')
+        .insert(newUserPayload)
+        .select()
+        .single();
+
+    if (profileError) throw profileError;
+
     setCurrentUser(newUser);
     return newUser;
   };
