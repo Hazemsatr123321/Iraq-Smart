@@ -15,6 +15,7 @@ import { ShieldCheckIcon } from '../components/icons/ShieldCheckIcon';
 import { StarIcon } from '../components/icons/StarIcon';
 import { HandHeartIcon } from '../components/icons/HandHeartIcon';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { uploadImage } from '../services/storageService';
 
 const STEPS = ['التفاصيل', 'البيع', 'الصور', 'المراجعة'];
 
@@ -165,13 +166,18 @@ export const PostAdPage: React.FC<{
     }
     setIsSubmitting(true);
     try {
-        if (!formData.images || formData.images.length === 0) {
+        if (imageFiles.size === 0 && (!existingAd || existingAd.images.length === 0)) {
             addToast("الرجاء إضافة صورة واحدة على الأقل للإعلان.", 'error');
             setIsSubmitting(false);
             return;
         }
 
-        const finalImageUrls = formData.images || [];
+        addToast("جاري رفع الصور، قد يستغرق الأمر بعض الوقت...", 'success');
+        const uploadPromises = Array.from(imageFiles.values()).map(file => uploadImage(file));
+        const uploadedUrls = await Promise.all(uploadPromises);
+
+        const existingImageUrls = formData.images?.filter(url => !url.startsWith('blob:')) || [];
+        const finalImageUrls = [...existingImageUrls, ...uploadedUrls];
 
         const finalPrice = isAuction ? `يبدأ من ${auctionStartPrice} د.ع` : formData.price;
         const finalPriceTiers = priceTiers.filter(pt => pt.quantity && pt.price).map(pt => ({ quantity: Number(pt.quantity), price: pt.price }));

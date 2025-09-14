@@ -1,5 +1,3 @@
-
-
 import React, { createContext, useState, useContext, ReactNode, useCallback, useMemo, useEffect } from 'react';
 import type { User, Ad, ExternalAd, AppSettings, UserRole, Category, Province, Review, Notification, RequestForQuotation, Offer, FeatureFlag, Auction, Bid, PersonalizedOffer, StockWatch, MarketBrief, SystemHealth, SuspiciousActivity, Opportunity, DealMemo, SmartPayment, NegotiationSession, OrderEvent, NegotiationMessage, ChatConversation, ChatMessage, FlashDeal, Campaign, ChatMessageDbRow } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -59,6 +57,7 @@ interface AdminContextType extends Omit<AppState, 'settings'> {
   updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
   addExternalAd: (ad: Omit<ExternalAd, 'id'>) => Promise<void>;
   updateExternalAd: (ad: ExternalAd) => Promise<void>;
+  deleteExternalAd: (adId: string) => Promise<void>;
   addCategory: (name: string) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
   addSubcategory: (categoryId: string, name: string) => Promise<void>;
@@ -142,12 +141,14 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     { data: categories, error: categoriesError },
                     { data: provinces, error: provincesError },
                     { data: settings, error: settingsError },
+                    { data: externalAds, error: externalAdsError }
                 ] = await Promise.all([
                     supabase.from('users').select('*'),
                     supabase.from('ads').select('*'),
                     supabase.from('categories').select('*'),
                     supabase.from('provinces').select('*'),
                     supabase.from('app_settings').select('*').single(),
+                    supabase.from('external_ads').select('*'),
                 ]);
 
                 if (usersError) throw usersError;
@@ -155,6 +156,7 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 if (categoriesError) throw categoriesError;
                 if (provincesError) throw provincesError;
                 if (settingsError) throw settingsError;
+                if (externalAdsError) throw externalAdsError;
 
                 setState(prevState => ({
                     ...prevState,
@@ -163,6 +165,7 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     categories: categories || [],
                     provinces: provinces || [],
                     settings: settings || null,
+                    externalAds: externalAds || [],
                 }));
             } catch (error) {
                 console.error("Error loading initial data:", error);
@@ -310,6 +313,72 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         return newConversation;
     };
 
+    const addExternalAd = async (ad: Omit<ExternalAd, 'id'>) => {
+        const { data, error } = await supabase.from('external_ads').insert(ad).select().single();
+        if (error) throw error;
+        setState(prev => ({ ...prev, externalAds: [...prev.externalAds, data] }));
+    };
+
+    const updateExternalAd = async (ad: ExternalAd) => {
+        const { data, error } = await supabase.from('external_ads').update(ad).eq('id', ad.id).select().single();
+        if (error) throw error;
+        setState(prev => ({ ...prev, externalAds: prev.externalAds.map(a => a.id === ad.id ? data : a) }));
+    };
+
+    const deleteExternalAd = async (adId: string) => {
+        const { error } = await supabase.from('external_ads').delete().eq('id', adId);
+        if (error) throw error;
+        setState(prev => ({ ...prev, externalAds: prev.externalAds.filter(a => a.id !== adId) }));
+    };
+
+    const addCategory = async (name: string) => {
+        const { data, error } = await supabase.from('categories').insert({ name }).select().single();
+        if (error) throw error;
+        setState(prev => ({ ...prev, categories: [...prev.categories, data] }));
+    };
+
+    const deleteCategory = async (id: string) => {
+        const { error } = await supabase.from('categories').delete().eq('id', id);
+        if (error) throw error;
+        setState(prev => ({ ...prev, categories: prev.categories.filter(c => c.id !== id) }));
+    };
+
+    const addSubcategory = async (categoryId: string, name: string) => {
+        const category = state.categories.find(c => c.id === categoryId);
+        if (!category) return;
+        const newSubcategories = [...(category.subcategories || []), name];
+        const { data, error } = await supabase.from('categories').update({ subcategories: newSubcategories }).eq('id', categoryId).select().single();
+        if (error) throw error;
+        setState(prev => ({ ...prev, categories: prev.categories.map(c => c.id === categoryId ? data : c) }));
+    };
+
+    const deleteSubcategory = async (categoryId: string, name: string) => {
+        const category = state.categories.find(c => c.id === categoryId);
+        if (!category) return;
+        const newSubcategories = (category.subcategories || []).filter(s => s !== name);
+        const { data, error } = await supabase.from('categories').update({ subcategories: newSubcategories }).eq('id', categoryId).select().single();
+        if (error) throw error;
+        setState(prev => ({ ...prev, categories: prev.categories.map(c => c.id === categoryId ? data : c) }));
+    };
+
+    const addProvince = async (name: string) => {
+        const { data, error } = await supabase.from('provinces').insert({ name }).select().single();
+        if (error) throw error;
+        setState(prev => ({ ...prev, provinces: [...prev.provinces, data] }));
+    };
+
+    const deleteProvince = async (id: string) => {
+        const { error } = await supabase.from('provinces').delete().eq('id', id);
+        if (error) throw error;
+        setState(prev => ({ ...prev, provinces: prev.provinces.filter(p => p.id !== id) }));
+    };
+
+    const deleteReview = async (reviewId: string) => {
+        const { error } = await supabase.from('reviews').delete().eq('id', reviewId);
+        if (error) throw error;
+        setState(prev => ({ ...prev, reviews: prev.reviews.filter(r => r.id !== reviewId) }));
+    };
+
     const contextValue: AdminContextType = useMemo(() => ({
         ...state,
         settings: state.settings!,
@@ -328,6 +397,17 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         addConversation,
         updateConversationLastMessage,
         createNotification,
+        updateSettings,
+        addExternalAd,
+        updateExternalAd,
+        deleteExternalAd,
+        addCategory,
+        deleteCategory,
+        addSubcategory,
+        deleteSubcategory,
+        addProvince,
+        deleteProvince,
+        deleteReview,
         // Mocked or simplified implementations for other functions
         toggleAdFeature: async (adId: string) => {
             setState(prev => ({ ...prev, ads: prev.ads.map(ad => ad.id === adId ? { ...ad, featured: !ad.featured } : ad) }));
@@ -366,66 +446,13 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (error) throw error;
             setState(prev => ({ ...prev, users: prev.users.filter(u => u.id !== userId) }));
         },
-        updateSettings: async (newSettings) => {
-            const { data, error } = await supabase
-                .from('app_settings')
-                .update(newSettings)
-                .eq('id', 1)
-                .select()
-                .single();
-            if (error) throw error;
-            setState(prev => ({ ...prev, settings: data }));
-        },
-        addExternalAd: async () => {},
-        updateExternalAd: async () => {},
-        addCategory: async (name: string) => {
-            const { data, error } = await supabase.from('categories').insert({ name }).select().single();
-            if (error) throw error;
-            setState(prev => ({ ...prev, categories: [...prev.categories, data] }));
-        },
-        deleteCategory: async (id: string) => {
-            const { error } = await supabase.from('categories').delete().eq('id', id);
-            if (error) throw error;
-            setState(prev => ({ ...prev, categories: prev.categories.filter(c => c.id !== id) }));
-        },
-        addSubcategory: async (categoryId: string, name: string) => {
-            const category = state.categories.find(c => c.id === categoryId);
-            if (!category) return;
-            const newSubcategories = [...(category.subcategories || []), name];
-            const { data, error } = await supabase.from('categories').update({ subcategories: newSubcategories }).eq('id', categoryId).select().single();
-            if (error) throw error;
-            setState(prev => ({ ...prev, categories: prev.categories.map(c => c.id === categoryId ? data : c) }));
-        },
-        deleteSubcategory: async (categoryId: string, name: string) => {
-            const category = state.categories.find(c => c.id === categoryId);
-            if (!category) return;
-            const newSubcategories = (category.subcategories || []).filter(s => s !== name);
-            const { data, error } = await supabase.from('categories').update({ subcategories: newSubcategories }).eq('id', categoryId).select().single();
-            if (error) throw error;
-            setState(prev => ({ ...prev, categories: prev.categories.map(c => c.id === categoryId ? data : c) }));
-        },
-        addProvince: async (name: string) => {
-            const { data, error } = await supabase.from('provinces').insert({ name }).select().single();
-            if (error) throw error;
-            setState(prev => ({ ...prev, provinces: [...prev.provinces, data] }));
-        },
-        deleteProvince: async (id: string) => {
-            const { error } = await supabase.from('provinces').delete().eq('id', id);
-            if (error) throw error;
-            setState(prev => ({ ...prev, provinces: prev.provinces.filter(p => p.id !== id) }));
-        },
-        getReviewsForSeller: (sellerId) => state.reviews.filter(r => r.seller_id === sellerId),
-        deleteReview: async (reviewId: string) => {
-            const { error } = await supabase.from('reviews').delete().eq('id', reviewId);
-            if (error) throw error;
-            setState(prev => ({ ...prev, reviews: prev.reviews.filter(r => r.id !== reviewId) }));
-        },
         calculateAverageRating: (sellerId: string) => {
             const relevantReviews = state.reviews.filter(r => r.seller_id === sellerId);
             if (relevantReviews.length === 0) return { average: 0, count: 0 };
             const sum = relevantReviews.reduce((acc, r) => acc + r.rating, 0);
             return { average: sum / relevantReviews.length, count: relevantReviews.length };
         },
+        getReviewsForSeller: (sellerId) => state.reviews.filter(r => r.seller_id === sellerId),
         addReview: async () => {}, markAsRead: async () => {}, markAllAsRead: async () => {}, clearAllNotifications: async () => {},
         unreadNotificationCount: (userId: string) => state.notifications.filter(n => n.user_id === userId && !n.is_read).length,
         toggleFeatureFlag: async () => {},
