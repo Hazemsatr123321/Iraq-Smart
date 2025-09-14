@@ -264,6 +264,24 @@ export const PostAdPage: React.FC<{
                 </div>
               </div>
             )}
+
+            {!isEditMode && (
+                <div className="mt-6 pt-6 border-t border-gray-700">
+                    <div className="bg-yellow-900/30 p-4 rounded-lg border-2 border-yellow-600/50 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                            <StarIcon className="w-10 h-10 text-brand-accent flex-shrink-0"/>
+                            <div>
+                                <h4 className="font-bold text-lg text-white">تمييز إعلانك لانتشار أوسع!</h4>
+                                <p className="text-sm text-yellow-300/80">سيظهر إعلانك في الصفحة الرئيسية وفي أعلى نتائج البحث.</p>
+                            </div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" checked={wantsToFeature} onChange={(e) => setWantsToFeature(e.target.checked)} className="sr-only peer" />
+                            <div className="w-14 h-7 bg-gray-600 peer-focus:outline-none peer-focus:ring-brand-accent/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-brand-accent"></div>
+                        </label>
+                    </div>
+                </div>
+            )}
           </div>
         );
       case 2:
@@ -364,26 +382,6 @@ export const PostAdPage: React.FC<{
                {formData.ai_quality_verification_status === 'pending' && <p className="text-blue-400 text-sm mt-2 font-semibold">✓ تم طلب ختم الجودة الذكي.</p>}
                {formData.is_charitable && <p className="text-blue-400 text-sm mt-2 font-semibold">✓ هذا الإعلان يشارك في حملة دعم الفقراء.</p>}
             </div>
-            {!isEditMode && (
-                <div className="mt-6 space-y-4">
-                    <div className="bg-yellow-900/30 p-4 rounded-lg border-2 border-yellow-600/50 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                            <StarIcon className="w-10 h-10 text-brand-accent flex-shrink-0"/>
-                            <div>
-                                <h4 className="font-bold text-lg text-white">تمييز إعلانك لانتشار أوسع!</h4>
-                                <p className="text-sm text-yellow-300/80">سيظهر إعلانك في الصفحة الرئيسية وفي أعلى نتائج البحث مقابل <span className="font-bold">{settings.featured_ad_price?.toLocaleString()} د.ع</span>.</p>
-                            </div>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" checked={wantsToFeature} onChange={(e) => setWantsToFeature(e.target.checked)} className="sr-only peer" />
-                            <div className="w-14 h-7 bg-gray-600 peer-focus:outline-none peer-focus:ring-brand-accent/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-brand-accent"></div>
-                        </label>
-                    </div>
-                    <p className="text-sm text-yellow-400/80 text-center">
-                        {wantsToFeature ? "بعد إرسال الإعلان، ستظهر لك نافذة الدفع." : "يمكنك تمييز الإعلان لاحقاً من صفحة إعلاناتي."}
-                    </p>
-                </div>
-            )}
             <p className="text-sm text-yellow-400/80 text-center pt-4">سيتم إرسال إعلانك للمراجعة من قبل الإدارة قبل نشره.</p>
           </div>
         );

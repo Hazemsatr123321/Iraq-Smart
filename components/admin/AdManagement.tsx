@@ -103,6 +103,7 @@ export const AdManagement: React.FC<{ onNavigate: (path: string) => void }> = ({
                                             {isFlashDealActive && <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-400"><ZapIcon className="w-3 h-3"/> صفقة برق</span>}
                                             {ad.ai_quality_verification_status === 'pending' && <span className="text-xs text-blue-400">(ينتظر ختم الجودة)</span>}
                                             {ad.ai_quality_verification_status === 'verified' && <span className="text-xs text-blue-300">(✓ تم التحقق بالجودة)</span>}
+                                            {ad.featured_status === 'pending_payment' && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-purple-500/20 text-purple-400">بانتظار دفع التمييز</span>}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 space-y-2 whitespace-nowrap">
@@ -135,6 +136,12 @@ export const AdManagement: React.FC<{ onNavigate: (path: string) => void }> = ({
                                                 <span className="text-xs text-yellow-400 font-bold">ختم الجودة؟</span>
                                                 <button onClick={() => updateAd(ad.id, { ai_quality_verification_status: 'verified' })} className="font-medium rounded px-2 py-1 text-xs text-green-400 hover:bg-green-500/10">موافقة</button>
                                                 <button onClick={() => updateAd(ad.id, { ai_quality_verification_status: 'rejected' })} className="font-medium rounded px-2 py-1 text-xs text-red-400 hover:bg-red-500/10">رفض</button>
+                                            </div>
+                                        )}
+                                        {ad.featured_status === 'pending_payment' && ad.status === 'approved' && (
+                                            <div className="flex items-center gap-1 pt-2 border-t border-gray-700/50">
+                                                <span className="text-xs text-purple-400 font-bold">تأكيد دفع التمييز؟</span>
+                                                <button onClick={() => updateAd(ad.id, { featured: true, featured_status: 'paid' })} className="font-medium rounded px-2 py-1 text-xs text-green-400 hover:bg-green-500/10">تأكيد</button>
                                             </div>
                                         )}
                                         <button 

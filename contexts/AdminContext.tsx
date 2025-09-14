@@ -141,7 +141,14 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     { data: categories, error: categoriesError },
                     { data: provinces, error: provincesError },
                     { data: settings, error: settingsError },
-                    { data: externalAds, error: externalAdsError }
+                    { data: externalAds, error: externalAdsError },
+                    { data: reviews, error: reviewsError },
+                    { data: rfqs, error: rfqsError },
+                    { data: offers, error: offersError },
+                    { data: dealMemos, error: dealMemosError },
+                    { data: smartPayments, error: smartPaymentsError },
+                    { data: marketBriefs, error: marketBriefsError },
+                    { data: featureFlags, error: featureFlagsError }
                 ] = await Promise.all([
                     supabase.from('users').select('*'),
                     supabase.from('ads').select('*'),
@@ -149,6 +156,13 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     supabase.from('provinces').select('*'),
                     supabase.from('app_settings').select('*').single(),
                     supabase.from('external_ads').select('*'),
+                    supabase.from('reviews').select('*'),
+                    supabase.from('rfqs').select('*'),
+                    supabase.from('offers').select('*'),
+                    supabase.from('deal_memos').select('*'),
+                    supabase.from('smart_payments').select('*'),
+                    supabase.from('market_briefs').select('*'),
+                    supabase.from('feature_flags').select('*'),
                 ]);
 
                 if (usersError) throw usersError;
@@ -157,6 +171,13 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 if (provincesError) throw provincesError;
                 if (settingsError) throw settingsError;
                 if (externalAdsError) throw externalAdsError;
+                if (reviewsError) throw reviewsError;
+                if (rfqsError) throw rfqsError;
+                if (offersError) throw offersError;
+                if (dealMemosError) throw dealMemosError;
+                if (smartPaymentsError) throw smartPaymentsError;
+                if (marketBriefsError) throw marketBriefsError;
+                if (featureFlagsError) throw featureFlagsError;
 
                 setState(prevState => ({
                     ...prevState,
@@ -166,6 +187,13 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     provinces: provinces || [],
                     settings: settings || null,
                     externalAds: externalAds || [],
+                    reviews: reviews || [],
+                    rfqs: rfqs || [],
+                    offers: offers || [],
+                    dealMemos: dealMemos || [],
+                    smartPayments: smartPayments || [],
+                    marketBriefs: marketBriefs || [],
+                    featureFlags: featureFlags || [],
                 }));
             } catch (error) {
                 console.error("Error loading initial data:", error);
@@ -379,6 +407,12 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setState(prev => ({ ...prev, reviews: prev.reviews.filter(r => r.id !== reviewId) }));
     };
 
+    const addReview = async (reviewData: Omit<Review, 'id' | 'timestamp'>) => {
+        const { data, error } = await supabase.from('reviews').insert(reviewData).select().single();
+        if (error) throw error;
+        setState(prev => ({ ...prev, reviews: [...prev.reviews, data] }));
+    };
+
     const contextValue: AdminContextType = useMemo(() => ({
         ...state,
         settings: state.settings!,
@@ -408,6 +442,7 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         addProvince,
         deleteProvince,
         deleteReview,
+        addReview,
         // Mocked or simplified implementations for other functions
         toggleAdFeature: async (adId: string) => {
             setState(prev => ({ ...prev, ads: prev.ads.map(ad => ad.id === adId ? { ...ad, featured: !ad.featured } : ad) }));
@@ -453,18 +488,84 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             return { average: sum / relevantReviews.length, count: relevantReviews.length };
         },
         getReviewsForSeller: (sellerId) => state.reviews.filter(r => r.seller_id === sellerId),
-        addReview: async () => {}, markAsRead: async () => {}, markAllAsRead: async () => {}, clearAllNotifications: async () => {},
+        markAsRead: async () => {}, markAllAsRead: async () => {}, clearAllNotifications: async () => {},
         unreadNotificationCount: (userId: string) => state.notifications.filter(n => n.user_id === userId && !n.is_read).length,
-        toggleFeatureFlag: async () => {},
+        toggleFeatureFlag: async (featureId: string) => {
+            const flag = state.featureFlags.find(f => f.id === featureId);
+            if (!flag) return;
+            const { data, error } = await supabase.from('feature_flags').update({ is_enabled: !flag.is_enabled }).eq('id', featureId).select().single();
+            if (error) throw error;
+            setState(prev => ({ ...prev, featureFlags: prev.featureFlags.map(f => f.id === featureId ? data : f) }));
+        },
         getPricingAnalysis: () => ({ myPrice: null, competitorPrices: [] }), getDemandHotspots: () => [],
         getProductOpportunities: () => [], getOpportunitiesForUser: () => [],
         getAuctionById: (auctionId: string) => state.auctions.find(a => a.id === auctionId),
-        addRfq: async () => {}, addOfferToRfq: async () => {},
+        addRfq: async (rfqData: Omit<RequestForQuotation, 'id' | 'user_id' | 'timestamp' | 'status'>, userId: string) => {
+            const { data, error } = await supabase.from('rfqs').insert([{ ...rfqData, user_id: userId }]).select().single();
+            if (error) throw error;
+            setState(prev => ({ ...prev, rfqs: [...prev.rfqs, data] }));
+        },
+        addOfferToRfq: async (offerData: Omit<Offer, 'id' | 'seller_id' | 'timestamp'>, sellerId: string) => {
+            const { data, error } = await supabase.from('offers').insert([{ ...offerData, seller_id: sellerId }]).select().single();
+            if (error) throw error;
+            setState(prev => ({ ...prev, offers: [...prev.offers, data] }));
+        },
         getOffersForRfq: (rfqId: string) => state.offers.filter(o => o.rfq_id === rfqId),
-        addMarketBrief: async (brief) => { const newBrief: MarketBrief = { ...brief, id: `brief-${Date.now()}` }; setState(prev => ({ ...prev, marketBriefs: [...prev.marketBriefs, newBrief] })); }, addDealMemo: async () => ({} as DealMemo), updateDealMemo: async () => {},
+        addMarketBrief: async (brief: Omit<MarketBrief, 'id'>) => {
+            const { data, error } = await supabase.from('market_briefs').insert(brief).select().single();
+            if (error) throw error;
+            setState(prev => ({ ...prev, marketBriefs: [...prev.marketBriefs, data] }));
+        },
+        addDealMemo: async (conversationId: string, dealDetails: Omit<DealMemo, 'id'|'conversation_id'|'status'|'approver_ids'|'timestamp'>, creatorId: string) => {
+            const { data, error } = await supabase.from('deal_memos').insert([{ ...dealDetails, conversation_id: conversationId, approver_ids: [creatorId] }]).select().single();
+            if (error) throw error;
+            setState(prev => ({ ...prev, dealMemos: [...prev.dealMemos, data] }));
+            return data;
+        },
+        updateDealMemo: async (memoId: string, updatedData: Partial<Omit<DealMemo, 'id'>>) => {
+            const { data, error } = await supabase.from('deal_memos').update(updatedData).eq('id', memoId).select().single();
+            if (error) throw error;
+            setState(prev => ({ ...prev, dealMemos: prev.dealMemos.map(m => m.id === memoId ? data : m) }));
+        },
         scanForSuspiciousActivity: async () => {}, getSmartPaymentByMemoId: (memoId: string) => state.smartPayments.find(p => p.memo_id === memoId),
-        initiateSmartPayment: async () => ({} as SmartPayment), updateSmartPaymentStatus: async () => {},
-        addShippingInfoToPayment: async () => {}, raiseDispute: async () => {}, resolveDispute: async () => {},
+        initiateSmartPayment: async (memoId: string, buyerId: string, sellerId: string, amount: number) => {
+            const newPayment = {
+                memo_id: memoId,
+                buyer_id: buyerId,
+                seller_id: sellerId,
+                amount: amount,
+                status: 'pending_deposit',
+                order_history: [{ timestamp: new Date().toISOString(), status: 'pending_deposit', description: 'Payment initiated.' }]
+            };
+            const { data, error } = await supabase.from('smart_payments').insert(newPayment).select().single();
+            if (error) throw error;
+            setState(prev => ({ ...prev, smartPayments: [...prev.smartPayments, data] }));
+            return data;
+        },
+        updateSmartPaymentStatus: async (paymentId: string, status: SmartPayment['status'], description?: string) => {
+            const payment = state.smartPayments.find(p => p.id === paymentId);
+            if (!payment) return;
+            const newOrderHistory = [...payment.order_history, { timestamp: new Date().toISOString(), status, description: description || status }];
+            const { data, error } = await supabase.from('smart_payments').update({ status, order_history: newOrderHistory }).eq('id', paymentId).select().single();
+            if (error) throw error;
+            setState(prev => ({ ...prev, smartPayments: prev.smartPayments.map(p => p.id === paymentId ? data : p) }));
+        },
+        addShippingInfoToPayment: async (paymentId: string, shippingInfo: { company: string; tracking_number: string; }) => {
+            const { data, error } = await supabase.from('smart_payments').update({ shipping_info: shippingInfo }).eq('id', paymentId).select().single();
+            if (error) throw error;
+            setState(prev => ({ ...prev, smartPayments: prev.smartPayments.map(p => p.id === paymentId ? data : p) }));
+        },
+        raiseDispute: async (paymentId: string, reason: string) => {
+            const { data, error } = await supabase.from('smart_payments').update({ dispute_reason: reason, status: 'disputed' }).eq('id', paymentId).select().single();
+            if (error) throw error;
+            setState(prev => ({ ...prev, smartPayments: prev.smartPayments.map(p => p.id === paymentId ? data : p) }));
+        },
+        resolveDispute: async (paymentId: string, resolution: 'refund' | 'payout') => {
+            const newStatus = resolution === 'refund' ? 'completed' : 'completed'; // Or custom statuses
+            const { data, error } = await supabase.from('smart_payments').update({ status: newStatus }).eq('id', paymentId).select().single();
+            if (error) throw error;
+            setState(prev => ({ ...prev, smartPayments: prev.smartPayments.map(p => p.id === paymentId ? data : p) }));
+        },
         calculatePartnershipScore: () => ({ dealCount: 0, avgRating: 0 }), grantReferralReward: async () => {},
         applyFreeFeature: async () => {}, addNegotiationSession: async () => ({} as NegotiationSession),
         addNegotiationMessage: async () => {}, addDonationToCampaign: async () => {}, addCampaign: async () => ({} as Campaign),

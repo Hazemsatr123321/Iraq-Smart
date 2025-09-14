@@ -22,10 +22,10 @@ interface FeatureAdModalProps {
   addToast: (message: string, type?: ToastType) => void;
 }
 
-type PaymentMethod = 'zain' | 'asia' | 'card';
+type PaymentMethod = 'zain' | 'asia';
 
 export const FeatureAdModal: React.FC<FeatureAdModalProps> = ({ ad, onClose, addToast }) => {
-  const { settings } = useAdmin();
+  const { settings, updateAd } = useAdmin();
   const [activeMethod, setActiveMethod] = useState<PaymentMethod>('zain');
   const [transactionId, setTransactionId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,18 +34,25 @@ export const FeatureAdModal: React.FC<FeatureAdModalProps> = ({ ad, onClose, add
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (activeMethod !== 'card' && !transactionId.trim()) {
+    if (!transactionId.trim()) {
         addToast("الرجاء إدخال رقم عملية التحويل.", "error");
         return;
     }
     
     setIsSubmitting(true);
-    // Simulate API call
-    await new Promise(res => setTimeout(res, 2000));
-    
-    setIsSubmitting(false);
-    addToast("تم استلام طلبك لتمييز الإعلان. سيتم تفعيله بعد المراجعة.", "success");
-    onClose();
+    try {
+        await updateAd(ad.id, {
+            featured_status: 'pending_payment',
+            payment_transaction_id: transactionId
+        });
+        addToast("تم استلام طلبك لتمييز الإعلان. سيتم تفعيله بعد المراجعة.", "success");
+        onClose();
+    } catch (error) {
+        addToast("حدث خطأ أثناء إرسال طلبك. الرجاء المحاولة مرة أخرى.", "error");
+        console.error("Error submitting feature request:", error);
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   const renderPaymentContent = () => {
@@ -64,17 +71,6 @@ export const FeatureAdModal: React.FC<FeatureAdModalProps> = ({ ad, onClose, add
                     <p className="text-center">يرجى تحويل مبلغ <strong className="text-brand-accent">{settings.featured_ad_price.toLocaleString()} دينار عراقي</strong> إلى الرقم التالي:</p>
                     <p className="text-center font-mono text-2xl bg-brand-primary/50 p-3 rounded-lg">{settings.asia_pay_number}</p>
                     <Input label="أدخل رقم عملية التحويل للتأكيد" value={transactionId} onChange={e => setTransactionId(e.target.value)} required />
-                </div>
-            );
-        case 'card':
-            return (
-                 <div className="space-y-4">
-                    <p className="text-center text-brand-text-secondary">سيتم خصم <strong className="text-brand-accent">{settings.featured_ad_price.toLocaleString()} دينار عراقي</strong> من بطاقتك.</p>
-                    <Input label="رقم البطاقة" placeholder="XXXX XXXX XXXX XXXX" />
-                    <div className="grid grid-cols-2 gap-4">
-                        <Input label="تاريخ الانتهاء" placeholder="MM/YY" />
-                        <Input label="CVC" placeholder="123" />
-                    </div>
                 </div>
             );
     }
@@ -101,16 +97,13 @@ export const FeatureAdModal: React.FC<FeatureAdModalProps> = ({ ad, onClose, add
                     <button type="button" onClick={() => setActiveMethod('asia')} className={`flex-1 p-2 rounded-md flex items-center justify-center gap-2 font-bold transition-colors ${activeMethod === 'asia' ? 'bg-brand-accent text-brand-primary' : 'hover:bg-brand-primary/50'}`}>
                         <AsiaPayIcon /> آسيا باي
                     </button>
-                    <button type="button" onClick={() => setActiveMethod('card')} className={`flex-1 p-2 rounded-md flex items-center justify-center gap-2 font-bold transition-colors ${activeMethod === 'card' ? 'bg-brand-accent text-brand-primary' : 'hover:bg-brand-primary/50'}`}>
-                        <CreditCardIcon /> بطاقة بنكية
-                    </button>
                 </div>
                 
                 {renderPaymentContent()}
                 
                 <div className="mt-6 flex gap-4">
                     <Button type="submit" className="w-full">
-                        {activeMethod === 'card' ? 'ادفع الآن' : 'تأكيد الدفع'}
+                        تأكيد الدفع
                     </Button>
                     <Button onClick={onClose} variant="secondary" className="w-full">إلغاء</Button>
                 </div>

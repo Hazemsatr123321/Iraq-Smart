@@ -57,7 +57,9 @@ CREATE TABLE ads (
     saves INTEGER DEFAULT 0,
     flash_deal JSONB,
     ai_quality_verification_status TEXT DEFAULT 'none',
-    is_charitable BOOLEAN DEFAULT false
+    is_charitable BOOLEAN DEFAULT false,
+    featured_status TEXT DEFAULT 'none',
+    payment_transaction_id TEXT
 );
 
 -- StockWatch Table
@@ -340,3 +342,8 @@ CREATE POLICY "Public read access" ON feature_flags FOR SELECT USING (true);
 CREATE POLICY "Public read access" ON market_briefs FOR SELECT USING (true);
 CREATE POLICY "Public read access" ON campaigns FOR SELECT USING (true);
 CREATE POLICY "Public read access" ON auctions FOR SELECT USING (true);
+
+-- Storage Policies
+INSERT INTO storage.buckets (id, name, public) VALUES ('ad-images', 'ad-images', true) ON CONFLICT (id) DO NOTHING;
+CREATE POLICY "Ad images are publicly accessible." ON storage.objects FOR SELECT USING ( bucket_id = 'ad-images' );
+CREATE POLICY "Authenticated users can upload ad images." ON storage.objects FOR INSERT TO authenticated WITH CHECK ( bucket_id = 'ad-images' );
