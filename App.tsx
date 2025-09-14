@@ -361,7 +361,7 @@ const AppContent: React.FC = () => {
         const urlParams = new URLSearchParams(location.split('?')[1]);
         const refCode = urlParams.get('ref') || undefined;
 
-        if (settings.maintenance_mode && currentUser?.role !== 'admin') {
+        if (settings?.maintenance_mode && currentUser?.role !== 'admin') {
             return <MaintenancePage />;
         }
         
@@ -426,7 +426,7 @@ const AppContent: React.FC = () => {
 
     return (
         <div className="bg-brand-primary min-h-screen text-brand-text">
-            {settings.is_announcement_active && <AnnouncementBanner text={settings.announcement_text} type={settings.announcement_type} />}
+            {settings?.is_announcement_active && <AnnouncementBanner text={settings.announcement_text} type={settings.announcement_type} />}
             {impersonatingAdminId && <ImpersonationBanner adminName={users.find(u => u.id === impersonatingAdminId)?.name || 'Admin'} onStop={handleStopImpersonating} />}
             {showInstallBanner && <InstallPWA onInstall={handleInstall} onDismiss={handleDismissInstall} />}
             

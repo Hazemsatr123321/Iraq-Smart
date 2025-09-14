@@ -240,7 +240,7 @@ export const HomePage: React.FC<{
                   </div>
                 }
                 
-                 {settings.google_ads_enabled && (
+                 {settings?.google_ads_enabled && (
                    <div className="col-span-full bg-brand-secondary/30 rounded-lg flex items-center justify-center h-24 text-brand-text-secondary animate-fadeInUp" style={{ animationDelay: '1300ms' }}>
                       (مساحة إعلانية لـ Google AdMob Banner)
                   </div>

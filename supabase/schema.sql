@@ -1,5 +1,5 @@
 -- Users Table
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
@@ -23,20 +23,20 @@ CREATE TABLE users (
 );
 
 -- Categories Table
-CREATE TABLE categories (
+CREATE TABLE IF NOT EXISTS categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     subcategories TEXT[]
 );
 
 -- Provinces Table
-CREATE TABLE provinces (
+CREATE TABLE IF NOT EXISTS provinces (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL
 );
 
 -- Ads Table
-CREATE TABLE ads (
+CREATE TABLE IF NOT EXISTS ads (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title TEXT NOT NULL,
     description TEXT NOT NULL,
@@ -63,7 +63,7 @@ CREATE TABLE ads (
 );
 
 -- StockWatch Table
-CREATE TABLE stock_watches (
+CREATE TABLE IF NOT EXISTS stock_watches (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) NOT NULL,
     keywords TEXT NOT NULL,
@@ -72,7 +72,7 @@ CREATE TABLE stock_watches (
 );
 
 -- Reviews Table
-CREATE TABLE reviews (
+CREATE TABLE IF NOT EXISTS reviews (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     ad_id UUID REFERENCES ads(id) NOT NULL,
     reviewer_id UUID REFERENCES users(id) NOT NULL,
@@ -83,7 +83,7 @@ CREATE TABLE reviews (
 );
 
 -- External Ads Table
-CREATE TABLE external_ads (
+CREATE TABLE IF NOT EXISTS external_ads (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_name TEXT NOT NULL,
     image_url TEXT NOT NULL,
@@ -92,7 +92,7 @@ CREATE TABLE external_ads (
 );
 
 -- App Settings Table
-CREATE TABLE app_settings (
+CREATE TABLE IF NOT EXISTS app_settings (
     id INTEGER PRIMARY KEY,
     google_ads_enabled BOOLEAN,
     featured_ad_price INTEGER,
@@ -106,8 +106,14 @@ CREATE TABLE app_settings (
     small_projects_program_description TEXT
 );
 
+-- Seed initial app settings
+INSERT INTO app_settings (id, google_ads_enabled, featured_ad_price, announcement_text, announcement_type, is_announcement_active, maintenance_mode, zain_cash_number, asia_pay_number, charity_program_description, small_projects_program_description)
+VALUES (1, false, 5000, '', 'info', false, false, '07800000000', '07700000000', 'يتم تعريف هذا البرنامج من لوحة تحكم المدير.', 'يتم تعريف هذا البرنامج من لوحة تحكم المدير.')
+ON CONFLICT (id) DO NOTHING;
+
+
 -- Notifications Table
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) NOT NULL,
     type TEXT NOT NULL,
@@ -119,7 +125,7 @@ CREATE TABLE notifications (
 );
 
 -- RFQs Table
-CREATE TABLE rfqs (
+CREATE TABLE IF NOT EXISTS rfqs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) NOT NULL,
     product_name TEXT NOT NULL,
@@ -132,7 +138,7 @@ CREATE TABLE rfqs (
 );
 
 -- Offers Table
-CREATE TABLE offers (
+CREATE TABLE IF NOT EXISTS offers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     rfq_id UUID REFERENCES rfqs(id) NOT NULL,
     seller_id UUID REFERENCES users(id) NOT NULL,
@@ -142,7 +148,7 @@ CREATE TABLE offers (
 );
 
 -- Feature Flags Table
-CREATE TABLE feature_flags (
+CREATE TABLE IF NOT EXISTS feature_flags (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
@@ -150,7 +156,7 @@ CREATE TABLE feature_flags (
 );
 
 -- Auctions Table
-CREATE TABLE auctions (
+CREATE TABLE IF NOT EXISTS auctions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     ad_id UUID REFERENCES ads(id) NOT NULL,
     start_time TIMESTAMPTZ NOT NULL,
@@ -163,7 +169,7 @@ CREATE TABLE auctions (
 );
 
 -- Personalized Offers Table
-CREATE TABLE personalized_offers (
+CREATE TABLE IF NOT EXISTS personalized_offers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     ad_id UUID REFERENCES ads(id) NOT NULL,
     seller_id UUID REFERENCES users(id) NOT NULL,
@@ -172,14 +178,14 @@ CREATE TABLE personalized_offers (
 );
 
 -- Market Briefs Table
-CREATE TABLE market_briefs (
+CREATE TABLE IF NOT EXISTS market_briefs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     date DATE NOT NULL,
     content TEXT
 );
 
 -- Suspicious Activities Table
-CREATE TABLE suspicious_activities (
+CREATE TABLE IF NOT EXISTS suspicious_activities (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     description TEXT,
     related_user_id UUID REFERENCES users(id),
@@ -189,18 +195,18 @@ CREATE TABLE suspicious_activities (
 );
 
 -- Opportunities Table
-CREATE TABLE opportunities (
+CREATE TABLE IF NOT EXISTS opportunities (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) NOT NULL,
     type TEXT,
     title TEXT,
     description TEXT,
     related_id UUID,
-    timestamp TIMESTAMTz DEFAULT now()
+    timestamp TIMESTAMPTZ DEFAULT now()
 );
 
 -- Deal Memos Table
-CREATE TABLE deal_memos (
+CREATE TABLE IF NOT EXISTS deal_memos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     conversation_id UUID NOT NULL,
     product TEXT,
@@ -214,7 +220,7 @@ CREATE TABLE deal_memos (
 );
 
 -- Smart Payments Table
-CREATE TABLE smart_payments (
+CREATE TABLE IF NOT EXISTS smart_payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     memo_id UUID REFERENCES deal_memos(id),
     amount NUMERIC,
@@ -227,7 +233,7 @@ CREATE TABLE smart_payments (
 );
 
 -- Negotiation Sessions Table
-CREATE TABLE negotiation_sessions (
+CREATE TABLE IF NOT EXISTS negotiation_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     ad_id UUID REFERENCES ads(id),
     buyer_id UUID REFERENCES users(id),
@@ -239,7 +245,7 @@ CREATE TABLE negotiation_sessions (
 );
 
 -- Campaigns Table
-CREATE TABLE campaigns (
+CREATE TABLE IF NOT EXISTS campaigns (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title TEXT,
     description TEXT,
@@ -251,14 +257,14 @@ CREATE TABLE campaigns (
 );
 
 -- Chat Conversations Table
-CREATE TABLE chat_conversations (
+CREATE TABLE IF NOT EXISTS chat_conversations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     participant_ids UUID[],
     last_message JSONB
 );
 
 -- Chat Messages Table
-CREATE TABLE chat_messages (
+CREATE TABLE IF NOT EXISTS chat_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     conversation_id UUID REFERENCES chat_conversations(id),
     sender_id UUID REFERENCES users(id),
@@ -288,8 +294,6 @@ ALTER TABLE smart_payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE negotiation_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
-
--- Public tables (read-only for all)
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE provinces ENABLE ROW LEVEL SECURITY;
 ALTER TABLE external_ads ENABLE ROW LEVEL SECURITY;
@@ -301,49 +305,76 @@ ALTER TABLE campaigns ENABLE ROW LEVEL SECURITY;
 
 -- Policies
 -- Users
+DROP POLICY IF EXISTS "Users can view their own profile" ON users;
 CREATE POLICY "Users can view their own profile" ON users FOR SELECT USING (auth.uid() = id);
+DROP POLICY IF EXISTS "Users can update their own profile" ON users;
 CREATE POLICY "Users can update their own profile" ON users FOR UPDATE USING (auth.uid() = id);
 
 -- Ads
+DROP POLICY IF EXISTS "Ads are public" ON ads;
 CREATE POLICY "Ads are public" ON ads FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Users can insert their own ads" ON ads;
 CREATE POLICY "Users can insert their own ads" ON ads FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update their own ads" ON ads;
 CREATE POLICY "Users can update their own ads" ON ads FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete their own ads" ON ads;
 CREATE POLICY "Users can delete their own ads" ON ads FOR DELETE USING (auth.uid() = user_id);
 
 -- Stock Watches
+DROP POLICY IF EXISTS "Users can manage their own stock watches" ON stock_watches;
 CREATE POLICY "Users can manage their own stock watches" ON stock_watches FOR ALL USING (auth.uid() = user_id);
 
 -- Reviews
+DROP POLICY IF EXISTS "Reviews are public" ON reviews;
 CREATE POLICY "Reviews are public" ON reviews FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Users can insert reviews" ON reviews;
 CREATE POLICY "Users can insert reviews" ON reviews FOR INSERT WITH CHECK (auth.uid() = reviewer_id);
 
 -- Notifications
+DROP POLICY IF EXISTS "Users can manage their own notifications" ON notifications;
 CREATE POLICY "Users can manage their own notifications" ON notifications FOR ALL USING (auth.uid() = user_id);
 
 -- RFQs
+DROP POLICY IF EXISTS "Users can manage their own RFQs" ON rfqs;
 CREATE POLICY "Users can manage their own RFQs" ON rfqs FOR ALL USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Sellers can see relevant RFQs" ON rfqs;
 CREATE POLICY "Sellers can see relevant RFQs" ON rfqs FOR SELECT USING (EXISTS (SELECT 1 FROM users WHERE users.id = auth.uid() AND users.role = 'wholesaler'));
 
 -- Offers
+DROP POLICY IF EXISTS "Users can manage their own offers" ON offers;
 CREATE POLICY "Users can manage their own offers" ON offers FOR ALL USING (auth.uid() = seller_id);
+DROP POLICY IF EXISTS "Users can see offers on their RFQs" ON offers;
 CREATE POLICY "Users can see offers on their RFQs" ON offers FOR SELECT USING (EXISTS (SELECT 1 FROM rfqs WHERE rfqs.id = offers.rfq_id AND rfqs.user_id = auth.uid()));
 
 -- Chat
+DROP POLICY IF EXISTS "Users can access their own conversations" ON chat_conversations;
 CREATE POLICY "Users can access their own conversations" ON chat_conversations FOR SELECT USING (auth.uid() = ANY(participant_ids));
+DROP POLICY IF EXISTS "Users can insert messages in their conversations" ON chat_messages;
 CREATE POLICY "Users can insert messages in their conversations" ON chat_messages FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM chat_conversations WHERE chat_conversations.id = chat_messages.conversation_id AND auth.uid() = ANY(chat_conversations.participant_ids)));
+DROP POLICY IF EXISTS "Users can read messages in their conversations" ON chat_messages;
 CREATE POLICY "Users can read messages in their conversations" ON chat_messages FOR SELECT USING (EXISTS (SELECT 1 FROM chat_conversations WHERE chat_conversations.id = chat_messages.conversation_id AND auth.uid() = ANY(chat_conversations.participant_ids)));
 
 -- Public Read Policies
+DROP POLICY IF EXISTS "Public read access" ON categories;
 CREATE POLICY "Public read access" ON categories FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public read access" ON provinces;
 CREATE POLICY "Public read access" ON provinces FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public read access" ON external_ads;
 CREATE POLICY "Public read access" ON external_ads FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public read access" ON app_settings;
 CREATE POLICY "Public read access" ON app_settings FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public read access" ON feature_flags;
 CREATE POLICY "Public read access" ON feature_flags FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public read access" ON market_briefs;
 CREATE POLICY "Public read access" ON market_briefs FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public read access" ON campaigns;
 CREATE POLICY "Public read access" ON campaigns FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public read access" ON auctions;
 CREATE POLICY "Public read access" ON auctions FOR SELECT USING (true);
 
 -- Storage Policies
 INSERT INTO storage.buckets (id, name, public) VALUES ('ad-images', 'ad-images', true) ON CONFLICT (id) DO NOTHING;
+DROP POLICY IF EXISTS "Ad images are publicly accessible." ON storage.objects;
 CREATE POLICY "Ad images are publicly accessible." ON storage.objects FOR SELECT USING ( bucket_id = 'ad-images' );
+DROP POLICY IF EXISTS "Authenticated users can upload ad images." ON storage.objects;
 CREATE POLICY "Authenticated users can upload ad images." ON storage.objects FOR INSERT TO authenticated WITH CHECK ( bucket_id = 'ad-images' );

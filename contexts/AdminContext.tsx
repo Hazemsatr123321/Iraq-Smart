@@ -154,7 +154,7 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     supabase.from('ads').select('*'),
                     supabase.from('categories').select('*'),
                     supabase.from('provinces').select('*'),
-                    supabase.from('app_settings').select('*').single(),
+                    supabase.from('app_settings').select('*').maybeSingle(),
                     supabase.from('external_ads').select('*'),
                     supabase.from('reviews').select('*'),
                     supabase.from('rfqs').select('*'),
